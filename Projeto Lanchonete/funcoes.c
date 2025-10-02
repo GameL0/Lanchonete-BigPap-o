@@ -2,11 +2,16 @@
 #include <stdbool.h>
 #include "structs.h"
 
+/*############# FUNCAO SAIR ##################*/
 void sair(){
     printf("\nPrograma finalizado!");
     exit(0);
 }
 
+
+
+
+/*##################### FUNCAO MAIN LOOP ########################*/
 int receberInput(bool res_auto, int opc_auto, int opc_manual)
 {
     int var_control;
@@ -32,6 +37,13 @@ void  recepcao(Equipamento equipamentos[], Pedido pedido)
     //Remover da lista 
     equipamentos[RECEPCAO].fila.cabeca->pedido.itens[0];
 }
+
+
+
+
+
+
+/* ####################### FUNÇÕES HEAP #######################################*/
 
 int criarHeap(Heap *heap, int capacidade){
     heap->pedidos = (Pedido*) malloc(capacidade * sizeof(Pedido));
@@ -98,15 +110,76 @@ void descerNoHeap(Heap* heap, int indice){
     }
 }
 
-ListaPedidos removerLista(ListaPedidos lista)
-{
-    NodePedido *proxNode = lista.cabeca->prox;
-    proxNode->ante = NULL;
-    lista.cabeca->prox = NULL;
-    lista.cabeca = proxNode;
-    lista.quantidade--;
-    return lista;
+
+int removerItemPrioritario(Heap* heap, Pedido* pedidoRemovido){
+    if(heap->quantidade <= 0) return 0;
+
+    *pedidoRemovido = heap->pedidos[0];
+
+    if(heap->quantidade > 1){
+        heap->pedidos[0] = heap->pedidos[heap->quantidade - 1];
+        descerNoHeap(heap, 0);
+    }
+    heap->quantidade--;
+
+    return 1;
 }
+
+
+
+/**
+ * @brief Função auxiliar recursiva para imprimir o heap como uma árvore.
+ * Não precisa ser declarada no .h, pois é usada apenas por imprimirHeap.
+ * @param heap Ponteiro para o heap.
+ * @param indice Índice do nó atual a ser impresso.
+ * @param nivel Nível de profundidade na árvore (para indentação).
+ */
+void imprimirNoHeap(Heap* heap, int indice, int nivel) {
+    if (indice >= heap->quantidade) {
+        return;
+    }
+
+    // Visita o filho da direita primeiro
+    imprimirNoHeap(heap, 2 * indice + 2, nivel + 1);
+
+    // Imprime o nó atual com indentação
+    for (int i = 0; i < nivel; i++) {
+        printf("    ");
+    }
+    printf("(ID: %d T:%d)\n", heap->pedidos[indice].id, heap->pedidos[indice].tempo_preparo_total);
+
+    // Visita o filho da esquerda
+    imprimirNoHeap(heap, 2 * indice + 1, nivel + 1);
+}
+
+/**
+ * @brief Imprime o estado atual do heap em dois formatos: vetor e árvore.
+ * @param heap Ponteiro para o heap a ser impresso.
+ */
+void imprimirHeap(Heap* heap) {
+    printf("\n--- ESTADO ATUAL DO HEAP ---\n");
+    if (heap->quantidade == 0) {
+        printf("Heap Vazio.\n");
+        printf("--------------------------\n");
+        return;
+    }
+
+    // Visão 1: Como Vetor (Layout da Memória)
+    printf("Visao Vetor [Quantidade: %d, Capacidade: %d]\n", heap->quantidade, heap->capacidade);
+    printf("[ ");
+    for (int i = 0; i < heap->quantidade; i++) {
+        printf("(ID: %d T:%d) | ", heap->pedidos[i].id, heap->pedidos[i].tempo_preparo_total);
+    }
+    printf("]\n\n");
+
+    // Visão 2: Como Árvore (Estrutura Lógica)
+    printf("Visao Arvore (Raiz a esquerda):\n");
+    imprimirNoHeap(heap, 0, 0); // Chama a função recursiva a partir da raiz
+    printf("--------------------------\n");
+}
+
+
+/*################# FUNCOES LISTA DE PEDIDOS ##################################*/
 
 ListaPedidos criarLista()
 {
@@ -114,6 +187,16 @@ ListaPedidos criarLista()
     lista.quantidade = 0;
     lista.cabeca = NULL;
     lista.cauda = NULL;
+    return lista;
+}
+
+ListaPedidos removerLista(ListaPedidos lista)
+{
+    NodePedido *proxNode = lista.cabeca->prox;
+    proxNode->ante = NULL;
+    lista.cabeca->prox = NULL;
+    lista.cabeca = proxNode;
+    lista.quantidade--;
     return lista;
 }
 
@@ -128,6 +211,12 @@ ListaPedidos adicionarLista(ListaPedidos lista, Pedido pedido)
     lista.quantidade++;
     return lista;
 }
+
+
+
+
+
+/*################# FUNCOES IMPRIMIR #####################*/
 
 void imprimirStatusPedido(StatusPedido status)
 {
@@ -240,6 +329,11 @@ void imprimirLista(ListaPedidos lista)
     printf("Quantidade de pedidos: %d\n", lista.quantidade);
 }
 
+
+
+
+/*#################### SEM DEFINICAO ########################*/
+
 int calcularPreparo(NomePedido pedido) //Retorna o tempo de preparo em segundos
 {
     switch(pedido)
@@ -267,72 +361,6 @@ int calcularPreparo(NomePedido pedido) //Retorna o tempo de preparo em segundos
     }
 }
 
-int removerItemPrioritario(Heap* heap, Pedido* pedidoRemovido){
-    if(heap->quantidade <= 0) return 0;
-
-    *pedidoRemovido = heap->pedidos[0];
-
-    if(heap->quantidade > 1){
-        heap->pedidos[0] = heap->pedidos[heap->quantidade - 1];
-        descerNoHeap(heap, 0);
-    }
-    heap->quantidade--;
-
-    return 1;
-}
-
-// --- Funções de Impressão ---
-
-/**
- * @brief Função auxiliar recursiva para imprimir o heap como uma árvore.
- * Não precisa ser declarada no .h, pois é usada apenas por imprimirHeap.
- * @param heap Ponteiro para o heap.
- * @param indice Índice do nó atual a ser impresso.
- * @param nivel Nível de profundidade na árvore (para indentação).
- */
-void imprimirNoHeap(Heap* heap, int indice, int nivel) {
-    if (indice >= heap->quantidade) {
-        return;
-    }
-
-    // Visita o filho da direita primeiro
-    imprimirNoHeap(heap, 2 * indice + 2, nivel + 1);
-
-    // Imprime o nó atual com indentação
-    for (int i = 0; i < nivel; i++) {
-        printf("    ");
-    }
-    printf("(ID: %d T:%d)\n", heap->pedidos[indice].id, heap->pedidos[indice].tempo_preparo_total);
-
-    // Visita o filho da esquerda
-    imprimirNoHeap(heap, 2 * indice + 1, nivel + 1);
-}
-
-/**
- * @brief Imprime o estado atual do heap em dois formatos: vetor e árvore.
- * @param heap Ponteiro para o heap a ser impresso.
- */
-void imprimirHeap(Heap* heap) {
-    printf("\n--- ESTADO ATUAL DO HEAP ---\n");
-    if (heap->quantidade == 0) {
-        printf("Heap Vazio.\n");
-        printf("--------------------------\n");
-        return;
-    }
-
-    // Visão 1: Como Vetor (Layout da Memória)
-    printf("Visao Vetor [Quantidade: %d, Capacidade: %d]\n", heap->quantidade, heap->capacidade);
-    printf("[ ");
-    for (int i = 0; i < heap->quantidade; i++) {
-        printf("(ID: %d T:%d) | ", heap->pedidos[i].id, heap->pedidos[i].tempo_preparo_total);
-    }
-    printf("]\n\n");
-
-    // Visão 2: Como Árvore (Estrutura Lógica)
-    printf("Visao Arvore (Raiz a esquerda):\n");
-    imprimirNoHeap(heap, 0, 0); // Chama a função recursiva a partir da raiz
-    printf("--------------------------\n");
-}
 
 // int verifica_chapa()
 // {
@@ -355,9 +383,6 @@ int tempo_restante(Pedido *pedido, Funcionario funcionario[], Equipamento equipa
     int local_vago;
     int tempo_funcionario;
 
-    
-    
-    
 /*
     - tempo_preparo = tempo que ele demora para ser preparado
     - local_vago = tempo onde o local onde ele será preparado estará vazio 
@@ -390,5 +415,4 @@ int tempo_restante(Pedido *pedido, Funcionario funcionario[], Equipamento equipa
 */
     return 0;
     }
-
 
