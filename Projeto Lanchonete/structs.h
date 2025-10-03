@@ -44,7 +44,7 @@ typedef struct{
     int num_habilidade;
     StatusFuncionario status;
     NomeLocal local_atual;
-    int id_pedido_atual; // Para saber qual pedido ele está trabalhando
+    NodePedido *pedido_trabalhado; // Para saber qual pedido ele está trabalhando
 } Funcionario; // :)^_____^O_O:-];O):O(>_<
 
 typedef struct 
@@ -54,6 +54,14 @@ typedef struct
     StatusItem status;
     Pedido *pedido;
 } ItemPreparo;
+
+typedef struct NodeFuncionario
+{
+    Funcionario funcionario;
+    struct NodeFuncionario *ante;
+    struct NodeFuncionario *prox;
+} NodeFuncionario;
+
 
 typedef struct 
 {
@@ -84,16 +92,6 @@ typedef struct
 } Heap;
 
 
-typedef struct NodeFuncionario
-{
-    Funcionario funcionario;
-    struct NodeFuncionario *ante;
-    struct NodeFuncionario *prox;
-} NodeFuncionario;
-
-
-
-
 typedef struct 
 {
     NomeLocal nome;
@@ -101,5 +99,5 @@ typedef struct
     ListaFuncionarios funcionario;
     Heap heap;
     int capacidade_usada;
-    Pedido pedido_sendo_feitos[6]; //Transformar em vetor dinamico
+    ListaPedidos pedido_sendo_feitos; //Transformar em vetor dinamico
 } Locais;

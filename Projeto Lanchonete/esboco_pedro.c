@@ -72,7 +72,7 @@ void separa_pedidos(pedido p)
     
     int separadores = 0; // Quantidade de separadores trabalhando
 
-    while(separa_funcionarios("separador") /e lista de espera tiver algo/)
+    while(separa_funcionarios("separador"))
     {
         separadores++;
 

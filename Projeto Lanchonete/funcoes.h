@@ -18,7 +18,6 @@ void imprimirHeap(Heap* heap);
 // Funções de Lista
 ListaPedidos criarLista();
 ListaPedidos removerLista(ListaPedidos lista);
-ListaPedidos adicionarLista(ListaPedidos lista, Pedido pedido);
 
 // Funções de Impressão
 void imprimirStatusPedido(StatusPedido status);
