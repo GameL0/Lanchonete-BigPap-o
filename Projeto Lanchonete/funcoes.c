@@ -11,7 +11,6 @@ void sair(){
     exit(0);
 }
 
-
 /*##################### FUNCAO MAIN LOOP ########################*/
 int receberInput(bool res_auto, int opc_auto, int opc_manual)
 {
@@ -409,7 +408,7 @@ NodePedido *receberPedido(bool res_auto)
 {
     Pedido novo_pedido;
     int item_comer, item_beber;
-
+    novo_pedido.status = RECEBIDO;
     for(int max_itens = 2; max_itens > 0; max_itens--){
         printf("\nEscolha ate 4 itens (2 de comer e 2 de beber)\n");
         printf("\n\n==== Itens de Comer ====\n");
@@ -417,7 +416,11 @@ NodePedido *receberPedido(bool res_auto)
         printf("Resposta: ");
         item_comer = receberInput(res_auto, 5, 5);
         item_comer--; //Tornar resposta compatível com a lista
-
+        if (item_comer == 4)
+        {
+            item_comer = NADA;
+        }
+        
         printf("\n\n==== Itens de Beber ====\n");
         printf("1 - Refrigerante\n 2 - Milk-Shake\n 3 - Suco\n 4 - Nao quero nada\n");
         printf("Resposta: ");
@@ -431,7 +434,6 @@ NodePedido *receberPedido(bool res_auto)
     NodePedido *node = criarNodePedido(novo_pedido);
     return node; //Retorna o ponteiro para o node do pedido
 } 
-
 
 /*#################### SEM DEFINICAO ########################*/
 
@@ -466,22 +468,6 @@ int calcularPreparo(NomePedido pedido) //Retorna o tempo de preparo em segundos
     }
 }
 
-
-// int verifica_chapa()
-// {
-//     return 0;
-// }
-
-// int verifica_batata()
-// {
-//     return 0;
-// }
-
-// int verifica_batata()
-// {
-//     return 0;
-// }
-
 NodeFuncionario* encontrarFuncionario(ListaFuncionarios *lista, Habilidade habilidade_requerida, Locais *local)
 {
     if(lista->cabeca == NULL)
@@ -514,6 +500,57 @@ NodeFuncionario* encontrarFuncionario(ListaFuncionarios *lista, Habilidade habil
 
     return NULL;
 }
+
+ListaItemPreparo* criarListaItemPreparo() 
+{
+    ListaItemPreparo *lista = (ListaItemPreparo*) malloc(sizeof(ListaItemPreparo));
+
+    if (lista != NULL) {
+        lista->cabeca = NULL;
+        lista->cauda = NULL;
+    }
+
+    return lista;
+}
+
+void inserirListaItemPreparo(ListaItemPreparo *lista, NodeItemPreparo *novoNode) 
+{
+    novoNode->ante = NULL;
+
+    if (lista->cabeca == NULL) 
+    {
+        novoNode->prox = NULL;
+        lista->cabeca = novoNode;
+        lista->cauda = novoNode;
+    } 
+    else 
+    {
+        novoNode->prox = lista->cauda;
+        lista->cauda->ante = novoNode;
+        lista->cauda = novoNode;
+    }
+}
+
+void removerListaItemPreparo(ListaItemPreparo *lista, NodeItemPreparo *nodeParaRemover)
+{
+    if (nodeParaRemover == lista->cabeca) 
+    {
+        lista->cabeca = nodeParaRemover->ante;
+    }
+    else if (nodeParaRemover == lista->cauda) 
+    {
+        lista->cauda = nodeParaRemover->prox;
+    }
+    else
+    {
+        nodeParaRemover->ante->prox = nodeParaRemover->prox;
+        nodeParaRemover->prox->ante = nodeParaRemover->ante;
+    }
+    // Isola o nó removido
+    nodeParaRemover->prox = NULL;
+    nodeParaRemover->ante = NULL;
+}
+
 
 /*
 int tempo_restante(Pedido *pedido, Funcionario funcionario[], Equipamento equipamentos[])
@@ -556,11 +593,95 @@ int tempo_restante(Pedido *pedido, Funcionario funcionario[], Equipamento equipa
     }
 */
 
-
-
 // Funções relacionados a bandeja
 
+NodeItemPreparo *criarNodeItemPreparo(ItemPreparo item)
+{
+    NodeItemPreparo *novo_node = (NodeItemPreparo*) malloc(sizeof(NodeItemPreparo)); 
+    novo_node->item = item;
+    novo_node->ante = NULL;
+    novo_node->prox = NULL;
+    return novo_node;
+}
 
+void separaPedidos(Equipamento equipamentos[], NodePedido *node_pedido)
+{
+    Pedido *pedido = &node_pedido->pedido;
+    for(int i = 0; i<4; i++)
+    {
+        ItemPreparo item;
+        item.pedido = pedido;
+        item.nome = pedido->itens[i].nome;
+        item.tempo_preparo = pedido->itens[i].tempo_preparo_total;
+        item.status = AGUARDANDO_PREPARADO;
+        NomePedido np = item.nome;
+        NodeItemPreparo *clone = criarNodeItemPreparo(item);
+        if(item.status == AGUARDANDO_PREPARADO)
+        {
+            if(np == SANDUICHE_SIMPLES || np == SANDUICHE_MEDIO || np == SANDUICHE_ELABORADO)
+            {
+                inserirListaItemPreparo(&equipamentos[CHAPA].fila_espera, clone);
+                printf("Item de sanduíche enviado para a fila de sanduíches (pedido %d).\n", pedido->id);
+            }
+            else if(np == REFRIGERANTE)
+            {
+                inserirListaItemPreparo(&equipamentos[PENEIRA].fila_espera, clone);
+                printf("Refrigerante enviado para a fila de bebidas (pedido %d).\n", pedido->id);
+            }
+            else if(np == MILK_SHAKE)
+            {
+                inserirListaItemPreparo(&equipamentos[LIQUIDIFICADOR_MILK_SHAKE].fila_espera, clone);
+                printf("Milk-shake enviado para a fila de milk-shakes (pedido %d).\n", pedido->id);
+            }
+            else if(np == SUCO)
+            {
+                inserirListaItemPreparo(&equipamentos[LIQUIDIFICADOR_SUCO].fila_espera, clone);
+                printf("Suco enviado para a fila de sucos (pedido %d).\n", pedido->id);
+            }
+        }   
+    }
+}
+
+void separador(Locais locais[], ListaFuncionarios *reserva_funcionarios, Equipamento equipamentos[], int ciclo)
+{
+    Locais *separador_local = &locais[SEPARADOR];
+    
+    NodePedido *pivo = locais[SEPARADOR].fila_espera.cauda;
+    while(pivo != NULL)
+    {
+        removerLista(locais[SEPARADOR].fila_espera);
+        inserirPedido(&locais[SEPARADOR].heap, pivo->pedido);
+        pivo = pivo->prox;
+    }
+
+    NodeFuncionario *f = encontrarFuncionario(reserva_funcionarios, HABILIDADE_SEPARACAO, SEPARADOR);
+            
+    diminuirCicloPedidos(ciclo, &locais[SEPARADOR].fila_espera);
+    
+    //Diminuir 
+/*
+            pedido_trabalhado->pedido.tempo_preparo_local -= ciclo;
+            printf("Separador: Funcionario %d trabalhando no pedido %d. Tempo restante: %d\n", func_pivo->funcionario.id, pedido_trabalhado->pedido.id, pedido_trabalhado->pedido.tempo_preparo_local);
+
+            // Se o tempo acabou, a separação foi concluída
+            if (pedido_trabalhado->pedido.tempo_preparo_local <= 0)
+            
+                printf("Separador: Funcionario %d finalizou a separacao do pedido %d.\n", func_pivo->funcionario.id, pedido_trabalhado->pedido.id);
+                
+                // "Separa Pedido()": Envia cada item para a fila do seu respectivo equipamento
+                separaPedidos(equipamentos, pedido_trabalhado);
+
+                // Libera o nó do pedido que estava sendo trabalhado, pois ele já foi dividido
+                free(pedido_trabalhado);
+
+                // "Libera Funcionário()": Remove o funcionário da lista de ativos do separador
+                separador_local->funcionario = removerListaFuncionario(separador_local->funcionario, func_pivo);
+                // E o devolve para a lista de reserva
+                liberarFuncionario(reserva_funcionarios, func_pivo);
+
+        func_pivo = proximo_func;
+    }
+*/
 void liberarFuncionario(ListaFuncionarios *reserva, NodeFuncionario *node_funcionario)
 {
     node_funcionario->funcionario.status = LIVRE;
@@ -625,6 +746,7 @@ void printarLocalFuncionario(Funcionario funcionario, NomeLocal novo_local)
     printf(".\n");
 }
 
+/*
 void montarBandeja(Locais *m, ListaPedidos *reserva, int ciclo) {
     if(m->fila_espera.cabeca == NULL) return;
 
@@ -658,7 +780,47 @@ void montarBandeja(Locais *m, ListaPedidos *reserva, int ciclo) {
     pedido->status = ENTREGUE; //pedido montado
 }
 
-void recepcao(Locais *r, int ciclo, bool res_auto, ListaFuncionarios *reserva)
+ListaFuncionarios inicializarFuncionarios()
+{
+    ListaFuncionarios lista_reserva = criarListaFuncionarios();
+
+    Funcionario equipe_inicial[] = {
+        {1, {HABILIDADE_CAIXA}, 1},
+        {2, {HABILIDADE_MONTAGEM}, 1},
+        {3, {HABILIDADE_SEPARACAO}, 1},
+        {4, {HABILIDADE_SANDUICHE, HABILIDADE_BATATA}, 2},
+        {5, {HABILIDADE_SANDUICHE, HABILIDADE_MONTAGEM}, 2},
+        {6, {HABILIDADE_BEBIDA, HABILIDADE_SUCO}, 2},
+        {7, {HABILIDADE_CAIXA, HABILIDADE_SEPARACAO, HABILIDADE_MONTAGEM}, 3}
+    };
+
+    int num_total_funcionarios = sizeof(equipe_inicial) / sizeof(Funcionario);
+    printf("Inicializando %d funcionarios...\n", num_total_funcionarios);
+
+    for (int i = 0; i < num_total_funcionarios; i++)
+    {
+        NodeFuncionario *novo_node = (NodeFuncionario*) malloc(sizeof(NodeFuncionario));
+        if (novo_node == NULL) {
+            printf("Erro de alocacao de memoria para o funcionario %d!\n", i + 1);
+            continue;
+        }
+
+        novo_node->funcionario = equipe_inicial[i];
+        novo_node->funcionario.status = LIVRE; 
+        novo_node->funcionario.local_atual = RESERVA;
+        novo_node->funcionario.pedido_trabalhado = NULL; 
+
+        novo_node->ante = NULL;
+        novo_node->prox = NULL;
+
+        adicionarListaFuncionario(&lista_reserva, novo_node);
+    }
+    
+    printf("Equipe de funcionarios criada e na reserva.\n");
+    return lista_reserva;
+}
+
+void recepcao(Locais *r, int ciclo, int tempo_global, bool res_auto, ListaFuncionarios *reserva, ListaPedidos *separador)
 {
     NodeFuncionario *recepcionista = encontrarFuncionario(reserva, HABILIDADE_CAIXA, RECEPCAO);
     if(recepcionista == NULL)
@@ -678,6 +840,8 @@ void recepcao(Locais *r, int ciclo, bool res_auto, ListaFuncionarios *reserva)
     {
         NodeFuncionario *funcionario_livre;
         r->funcionario = removerListaFuncionario(r->funcionario, funcionario_livre);
+        adicionarLista(&separador, funcionario_livre->funcionario.pedido_trabalhado);
         liberarFuncionario(reserva, funcionario_livre);
+        
     } //Entende-se que a cabeça da fila sempre será preparada primeiro
 }

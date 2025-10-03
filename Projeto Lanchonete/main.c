@@ -1,10 +1,10 @@
-// BAtman é overrated
+// SuperMan é overrated
 
 #include <stdio.h>
 #include <stdbool.h>
 #include <stdlib.h>
 #include <time.h>
-#include "funcoes.c"
+#include "funcoes.h"
 
 int fazerPedido(bool res_auto)
 {
@@ -48,7 +48,7 @@ void main_loop(int timer_global, int tam_ciclo, Equipamento equipamento[], Locai
                 recepcao(&locais[RECEPCAO], tam_ciclo, res_auto, &reserva);
                 break;
             case 2:
-                printf("Triste...\n");
+                printf("--\n");
                 break;
             case 3:
                 sair();
@@ -69,10 +69,36 @@ int main(){
     int tam_ciclo = 100;
 
     Equipamento equipamentos[4];
+    // Define a capacidade máxima de cada equipamento 
+    int capacidades_maximas[] = {
+        2, // PENEIRA (Fritadeira)
+        4, // CHAPA
+        1, // LIQUIDIFICADOR_MILK_SHAKE
+        1  // LIQUIDIFICADOR_SUCO
+    };
+
+    printf("Inicializando equipamentos...\n");
     for(int i = 0; i < 4; i++)
     {
-        equipamentos[i].nome = i;
-    }//Nomear cada equipamento
+        equipamentos[i].nome = i; // Atribui PENEIRA, CHAPA, etc.
+        equipamentos[i].capacidade_maxima = capacidades_maximas[i];
+        equipamentos[i].capacidade_usada = 0;
+
+        // Inicializa as listas de funcionários e a fila de espera de itens como vazias
+        equipamentos[i].funcionarios = criarListaFuncionarios();
+        equipamentos[i].fila_espera.cabeca = NULL;
+        equipamentos[i].fila_espera.cauda = NULL;
+
+        // Zera os arrays de preparo e armazenamento para evitar lixo de memória
+        for (int j = 0; j < 6; j++) {
+            equipamentos[i].itens_preparo[j].nome = NADA;
+        }
+        for (int j = 0; j < 4; j++) {
+            equipamentos[i].armazenamento[j].nome = NADA;
+        }
+    }
+    printf("Equipamentos inicializados com sucesso.\n");
+
 
     Locais locais[4];
     for(int i = 0; i < 4; i++)
@@ -83,7 +109,26 @@ int main(){
         locais[i].fila_espera = criarLista();
     }//Inicializar cada local
 
-    
+    int capacidade_heap_locais = 10; 
+
+    printf("Inicializando locais...\n");
+    for(int i = 0; i < 5; i++)
+    {
+        locais[i].nome = i; // Atribui RECEPCAO, MONTAR_BANDEJAS, etc.
+        locais[i].capacidade_usada = 0;
+        
+        // Inicializa as listas de funcionários e pedidos como vazias
+        locais[i].funcionario = criarListaFuncionarios();
+        locais[i].fila_espera = criarLista();
+        locais[i].pedido_sendo_feitos = criarLista();
+
+        // Inicializa o heap de prioridade para cada local
+        if (!criarHeap(&locais[i].heap, capacidade_heap_locais)) {
+            printf("Erro ao criar heap para o local %d\n", i);
+            // Tratar erro aqui, talvez saindo do programa
+        }
+    }
+    printf("Locais inicializados com sucesso.\n");
 
     main_loop(timer_global, tam_ciclo, equipamentos, locais);
     

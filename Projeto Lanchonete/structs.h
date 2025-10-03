@@ -62,6 +62,20 @@ typedef struct NodeFuncionario
     struct NodeFuncionario *prox;
 } NodeFuncionario;
 
+typedef struct NodeItemPreparo
+{
+    struct NodeItemPreparo *prox;
+    struct NodeItemPreparo *ante;
+    ItemPreparo item;
+} NodeItemPreparo;
+
+typedef struct 
+{
+    NodeItemPreparo *cabeca;
+    NodeItemPreparo *cauda;
+    int quantidade;
+} ListaItemPreparo;
+
 
 typedef struct 
 {
@@ -75,10 +89,11 @@ typedef struct{
     NomeEquipamento nome;
     int capacidade_maxima; // Sera definido pelas regras do nome Arthur
     int capacidade_usada;
+    ListaItemPreparo fila_espera;
     ItemPreparo itens_preparo[6];
     ItemPreparo armazenamento[4];
+
     ListaFuncionarios funcionarios;
-    ListaPedidos fila;
 } Equipamento;
 
 
