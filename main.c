@@ -12,6 +12,7 @@ void main_loop(int timer_global, int tam_ciclo, Equipamento equipamentos[], Loca
 
     ListaPedidos pedidos_entregues = criarLista();
     ListaPedidos pedidos_em_preparo = criarLista(); 
+    ListaPedidos pedidos_postergados = criarLista();
     bool res_auto = false;
     
     bool restaurante_aberto = true;
@@ -45,7 +46,7 @@ void main_loop(int timer_global, int tam_ciclo, Equipamento equipamentos[], Loca
             int op = fazerPedido(res_auto);
             switch (op) {
                 case 1:
-                    recepcao(&locais[RECEPCAO], res_auto, &reserva, estoque, timer_global, tempo_simulacao);
+                    recepcao(&locais[RECEPCAO], res_auto, &reserva, estoque, tempo_simulacao, equipamentos, &pedidos_postergados, timer_global);
                     break;
                 case 2:
                     printf("-- Sem novos pedidos neste ciclo --\n");
@@ -82,7 +83,7 @@ void main_loop(int timer_global, int tam_ciclo, Equipamento equipamentos[], Loca
 
         printf("\n--- [FASE 2: RELATÓRIO DE ESTADO ATUAL] ---\n");
         
-        imprimirStatusChapa(equipamentos[CHAPA]);
+        imprimirStatusEquipamentos(equipamentos);
 
         printf("\n=== ESTOQUE DE ITENS PRONTOS ===\n");
         imprimirListaArmazenados(*estoque);
@@ -107,6 +108,12 @@ void main_loop(int timer_global, int tam_ciclo, Equipamento equipamentos[], Loca
         imprimirLista(pedidos_em_preparo);
         printf("=============================================\n");
 
+        if (pedidos_postergados.cabeca != NULL) {
+            printf("\n=== PEDIDOS POSTERGADOS AGUARDANDO ===\n");
+            imprimirLista(pedidos_postergados);
+            printf("======================================\n");
+        }
+
         for (int i = 0; i < 5; i++) {
             if (locais[i].heap.quantidade > 0) {
                 printf("\n=== FILA DE PRIORIDADE - %s ===\n", nomes_locais[i]);
@@ -126,13 +133,20 @@ void main_loop(int timer_global, int tam_ciclo, Equipamento equipamentos[], Loca
         processarEquipamentos(equipamentos, &reserva, tam_ciclo, estoque, tempo_simulacao);
         processarMontagem(&locais[MONTAR_BANDEJAS], &reserva, &pedidos_entregues, tam_ciclo, tempo_simulacao, stats);
         
+        if (pedidos_postergados.cabeca != NULL && (!restaurante_aberto || !existemPedidosAtivos(locais, equipamentos, &pedidos_em_preparo))) {
+             NodePedido* pedido_postergado = removerListaPedidos_front(&pedidos_postergados);
+             printf("\nREINICIANDO PEDIDO POSTERGADO: Pedido ID %d esta sendo movido para a fila da recepcao.\n", pedido_postergado->pedido.id);
+             adicionarListaPedidos(&locais[RECEPCAO].fila_espera, pedido_postergado);
+        }
+        
         timer_global -= tam_ciclo;
         tempo_simulacao += tam_ciclo;
 
-        if (!restaurante_aberto && !existemPedidosAtivos(locais, equipamentos, &pedidos_em_preparo)) {
+        if (!restaurante_aberto && !existemPedidosAtivos(locais, equipamentos, &pedidos_em_preparo) && pedidos_postergados.cabeca == NULL) {
             printf("\nTODOS OS PEDIDOS FORAM FINALIZADOS. ENCERRANDO O EXPEDIENTE.\n");
             liberarListaFuncionarios(&reserva);
             liberarListaPedidos(&pedidos_entregues);
+            liberarListaPedidos(&pedidos_postergados);
             break;
         }
     }
@@ -151,7 +165,7 @@ int main() {
         locais[i].fila_espera = criarLista();
         locais[i].funcionario = criarListaFuncionarios();
         locais[i].pedido_sendo_feitos = criarLista();
-        criarHeap(&locais[i].heap, 20); // Aumentei a capacidade do heap
+        criarHeap(&locais[i].heap, 20);
     }
     printf("Locais inicializados.\n");
 

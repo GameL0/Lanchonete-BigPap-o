@@ -32,12 +32,14 @@ void imprimirLista(ListaPedidos lista);
 void imprimirNomeDoItem(NomePedido nome);
 void imprimirStatusItem(StatusItem status);
 void imprimirPedido(Pedido pedido);
-void imprimirStatusChapa(Equipamento chapa);
+void imprimirStatusEquipamentos(Equipamento equipamentos[]);
 
 // Funções de Lista de Itens para Preparo
 ListaItemPreparo criarListaItemPreparo();
 void adicionarListaItemPreparo(ListaItemPreparo *lista, NodeItemPreparo *novo_node);
 NodeItemPreparo* removerListaItemPreparo_front(ListaItemPreparo *lista);
+void removerNodeItemPreparo(ListaItemPreparo *lista, NodeItemPreparo *node);
+
 
 // Funções de Lista de Funcionários
 ListaFuncionarios criarListaFuncionarios();
@@ -62,10 +64,11 @@ void gerenciarPeneira(Equipamento *peneira, ListaFuncionarios *reserva);
 void gerenciarTodosEquipamentos(Equipamento equipamentos[], ListaFuncionarios *reserva);
 
 // Funções de Lógica da Lanchonete
+float estimarTempoTotalPedido(Pedido* pedido, Equipamento equipamentos[], Locais locais[]);
 NodePedido* receberPedido(bool res_auto, int *novo_id, int tempo_simulacao_atual);
 void atenderFilaRecepcao(Locais *local_recepcao, ListaFuncionarios *reserva);
 void distribuirItens(NodePedido *pedido_node, Equipamento equipamentos[], ListaItensArmazenados *estoque);
-void recepcao(Locais *r, bool res_auto, ListaFuncionarios *reserva, ListaItensArmazenados *estoque, int timer_global, int tempo_simulacao_atual);
+void recepcao(Locais *r, bool res_auto, ListaFuncionarios *reserva, ListaItensArmazenados *estoque, int tempo_simulacao_atual, Equipamento equipamentos[], ListaPedidos *pedidos_postergados, int timer_global);
 void separador(Locais *local_separador, ListaFuncionarios *reserva, ListaItensArmazenados *estoque);
 void processarRecepcao(Locais *local_recepcao, Locais *local_separador, ListaFuncionarios *reserva, int ciclo);
 void processarSeparador(Locais *local_separador, Equipamento equipamentos[], ListaFuncionarios *reserva, ListaPedidos *pedidos_em_preparo, int ciclo, ListaItensArmazenados *estoque);
