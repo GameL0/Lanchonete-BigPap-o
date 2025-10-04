@@ -1,12 +1,15 @@
+#ifndef ENUMS_H
+#define ENUMS_H
+
 // Enum para o status de um item individual do pedido
-typedef enum{
+typedef enum {
     AGUARDANDO_PREPARADO,
     EM_PREPARO,
     PRONTO
 } StatusItem;
 
 // Enum para o status geral de um pedido completo
-typedef enum{
+typedef enum {
     RECEBIDO,
     PREPARANDO_ITENS,
     AGUARDANDO_MONTAGEM,
@@ -15,14 +18,14 @@ typedef enum{
     ARMAZENADO
 } StatusPedido;
 
-typedef enum{
+typedef enum {
     PENEIRA,
     CHAPA,
     LIQUIDIFICADOR_MILK_SHAKE,
     LIQUIDIFICADOR_SUCO
 } NomeEquipamento;
 
-typedef enum{
+typedef enum {
     RECEPCAO,
     MONTAR_BANDEJAS,
     SEPARADOR,
@@ -31,24 +34,24 @@ typedef enum{
 } NomeLocal;
 
 // Enum para o status de um funcionário
-typedef enum{
+typedef enum {
     LIVRE,
     OCUPADO
 } StatusFuncionario;
 
-typedef enum{
+typedef enum {
     SANDUICHE_SIMPLES,
     SANDUICHE_MEDIO,
     SANDUICHE_ELABORADO,
     BATATA_FRITA,
     REFRIGERANTE,
     MILK_SHAKE,
-    SUCO, 
+    SUCO,
     NADA
 } NomePedido;
 
 // Enum para as diferentes habilidades que um funcionário pode ter
-typedef enum{
+typedef enum {
     HABILIDADE_CAIXA,
     HABILIDADE_SEPARACAO,
     HABILIDADE_SANDUICHE,
@@ -57,3 +60,5 @@ typedef enum{
     HABILIDADE_BEBIDA, // Refrigerantes e Milk-shakes
     HABILIDADE_MONTAGEM
 } Habilidade;
+
+#endif // ENUMS_H

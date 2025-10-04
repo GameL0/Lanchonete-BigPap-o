@@ -1,136 +1,127 @@
-// SuperMan é overrated
-
 #include <stdio.h>
-#include <stdbool.h>
 #include <stdlib.h>
+#include <stdbool.h>
 #include <time.h>
 #include "funcoes.h"
 
-int fazerPedido(bool res_auto)
-{
-    //Adicionar verificador do Heap
-    //Se o Heap estiver cheio, não fazer pedido
+int fazerPedido(bool res_auto) {
     printf("===============================================================\n");
     printf("BEM VINDO AO BIG PAPÃO, O SANDUICHE MAIS RAPIDO DO NORDESTE!!\n");
-    printf("Queres fazer you pedido ?\n");
-    printf(" 1 - Fazer Pedido\n 2 - Não fazer pedido... Vagabundo\n 3 - Fechar o código\n");
+    printf("Queres fazer your pedido ?\n");
+    printf(" 1 - Fazer Pedido\n 2 - Nao fazer pedido\n 3 - Fechar o programa\n");
     printf("Resposta: ");
     return receberInput(res_auto, 2, 3);
 }
 
-
-void main_loop(int timer_global, int tam_ciclo, Equipamento equipamento[], Locais locais[])
-{
-    ListaPedidos pedidos_em_espera = criarLista();
-
-    Heap fila_pedidos;
-    
-    bool res_auto;
+void main_loop(int timer_global, int tam_ciclo, Equipamento equipamentos[], Locais locais[]) {
     ListaFuncionarios reserva = criarListaFuncionarios();
-    
-    if(!criarHeap(&fila_pedidos, 10))
-    {
-        printf("Erro ao criar o heap.\n");
-        return;
-    }
+    inicializarFuncionarios(&reserva); 
 
-    printf("Ligar modo automático (1 - Sim, 2 - Não)?");
-    if(receberInput(false, 2, 2) == 1)
-    {
+    ListaPedidos pedidos_entregues = criarLista();
+    ListaPedidos pedidos_em_preparo = criarLista(); 
+    bool res_auto = false;
+
+    printf("Ligar modo automatico (1 - Sim, 2 - Nao)? ");
+    int escolha = receberInput(false, 2, 2);
+    if (escolha == 1) {
         res_auto = true;
-        srand(time(NULL));
+        srand((unsigned) time(NULL));
     }
-
-    do{
-        switch(fazerPedido(res_auto))
-        {
+    
+    do {
+        int op = fazerPedido(res_auto);
+        switch (op) {
             case 1:
-                recepcao(&locais[RECEPCAO], tam_ciclo, res_auto, &reserva);
+                recepcao(&locais[RECEPCAO], res_auto, &reserva);
                 break;
             case 2:
-                printf("--\n");
+                printf("-- sem pedido neste ciclo --\n");
                 break;
             case 3:
                 sair();
-                return;
+                break;
             default:
-                printf("Escreveu, nada com nada");
+                printf("Opcao invalida\n");
                 break;
         }
 
-        printf("%d seg\n", timer_global);
-        timer_global = timer_global - tam_ciclo;
-    } while(timer_global >= 0);
+        separador(&locais[SEPARADOR], &reserva);
+        
+        processarMontagem(&locais[MONTAR_BANDEJAS], &reserva, &pedidos_entregues, tam_ciclo);
+        processarEquipamentos(equipamentos, &reserva, tam_ciclo);
+        processarSeparador(&locais[SEPARADOR], equipamentos, &reserva, &pedidos_em_preparo, tam_ciclo);
+        processarRecepcao(&locais[RECEPCAO], &locais[SEPARADOR], &reserva, tam_ciclo);
+
+
+        printf("\n=== FILA DE ESPERA DA RECEPÇÃO ===\n");
+        imprimirLista(locais[RECEPCAO].fila_espera);
+        printf("======================================\n\n");
+
+        printf("Tempo global atual: %d s\n", timer_global);
+        
+        for (int i = 0; i < 5; i++) {
+            verificarEPriorizarPedidos(&locais[i], timer_global);
+        }
+        
+        for (int i = 0; i < 5; i++) {
+            if (locais[i].heap.quantidade > 0) {
+                printf("\n=== FILA DE PRIORIDADE - %s ===\n", 
+                    i == 0 ? "RECEPCAO" : 
+                    i == 1 ? "MONTAR_BANDEJAS" :
+                    i == 2 ? "SEPARADOR" :
+                    i == 3 ? "CAIXA" : "RESERVA");
+                imprimirHeap(&locais[i].heap);
+            }
+        }
+        verificarPedidosProntos(&pedidos_em_preparo, &locais[MONTAR_BANDEJAS]);
+
+        montarBandeja(&locais[MONTAR_BANDEJAS], &reserva);
+
+        printf("\n--- PEDIDOS ENTREGUES ---\n");
+        imprimirLista(pedidos_entregues);
+        printf("-------------------------\n");
+
+        timer_global -= tam_ciclo;
+    } while (timer_global >= 0);
 }
 
-
-int main(){
+int main() {
     int timer_global = 300;
-    int tam_ciclo = 100;
+    int tam_ciclo = 10;
+
+    Locais locais[5];
+    for (int i = 0; i < 5; ++i) {
+        locais[i].nome = (NomeLocal) i;
+        locais[i].fila_espera = criarLista();
+        locais[i].funcionario = criarListaFuncionarios();
+        locais[i].pedido_sendo_feitos = criarLista();
+        criarHeap(&locais[i].heap, 10);
+    }
+    printf("Locais inicializados.\n");
 
     Equipamento equipamentos[4];
-    // Define a capacidade máxima de cada equipamento 
     int capacidades_maximas[] = {
-        2, // PENEIRA (Fritadeira)
+        2, // PENEIRA
         4, // CHAPA
         1, // LIQUIDIFICADOR_MILK_SHAKE
         1  // LIQUIDIFICADOR_SUCO
     };
-
-    printf("Inicializando equipamentos...\n");
-    for(int i = 0; i < 4; i++)
-    {
-        equipamentos[i].nome = i; // Atribui PENEIRA, CHAPA, etc.
+    for (int i = 0; i < 4; ++i) {
+        equipamentos[i].nome = (NomeEquipamento) i;
         equipamentos[i].capacidade_maxima = capacidades_maximas[i];
         equipamentos[i].capacidade_usada = 0;
-
-        // Inicializa as listas de funcionários e a fila de espera de itens como vazias
-        equipamentos[i].funcionarios = criarListaFuncionarios();
-        equipamentos[i].fila_espera.cabeca = NULL;
-        equipamentos[i].fila_espera.cauda = NULL;
-
-        // Zera os arrays de preparo e armazenamento para evitar lixo de memória
-        for (int j = 0; j < 6; j++) {
-            equipamentos[i].itens_preparo[j].nome = NADA;
-        }
-        for (int j = 0; j < 4; j++) {
-            equipamentos[i].armazenamento[j].nome = NADA;
-        }
-    }
-    printf("Equipamentos inicializados com sucesso.\n");
-
-
-    Locais locais[4];
-    for(int i = 0; i < 4; i++)
-    {
-        locais[i].nome = i; //Permite que o nome do local seja igual ao índice do local
-        locais[i].capacidade_usada = 0;
-        locais[i].funcionario = criarListaFuncionarios();
-        locais[i].fila_espera = criarLista();
-    }//Inicializar cada local
-
-    int capacidade_heap_locais = 10; 
-
-    printf("Inicializando locais...\n");
-    for(int i = 0; i < 5; i++)
-    {
-        locais[i].nome = i; // Atribui RECEPCAO, MONTAR_BANDEJAS, etc.
-        locais[i].capacidade_usada = 0;
+        equipamentos[i].fila_espera = criarListaItemPreparo();
         
-        // Inicializa as listas de funcionários e pedidos como vazias
-        locais[i].funcionario = criarListaFuncionarios();
-        locais[i].fila_espera = criarLista();
-        locais[i].pedido_sendo_feitos = criarLista();
-
-        // Inicializa o heap de prioridade para cada local
-        if (!criarHeap(&locais[i].heap, capacidade_heap_locais)) {
-            printf("Erro ao criar heap para o local %d\n", i);
-            // Tratar erro aqui, talvez saindo do programa
+        for (int j = 0; j < MAX_CAPACIDADE_EQUIPAMENTO; j++) {
+            equipamentos[i].itens_em_preparo[j].nome = NADA;
+            equipamentos[i].funcionarios_alocados[j] = NULL;
         }
     }
-    printf("Locais inicializados com sucesso.\n");
+    printf("Equipamentos inicializados.\n");
 
     main_loop(timer_global, tam_ciclo, equipamentos, locais);
-    
+
+    for (int i = 0; i < 5; ++i) liberarHeap(&locais[i].heap);
+
     return 0;
 }

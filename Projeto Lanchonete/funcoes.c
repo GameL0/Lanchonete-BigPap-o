@@ -1,847 +1,737 @@
 #include <stdio.h>
-#include <stdbool.h>
 #include <stdlib.h>
+#include <stdbool.h>
 #include <time.h>
-#include "funcoes.h"
-// #include "structs.h"
+#include <string.h>
 
-/*############# FUNCAO SAIR ##################*/
-void sair(){
-    printf("\nPrograma finalizado!");
+#include "funcoes.h"
+
+/*----------------- Utilitários -----------------*/
+void sair() {
+    printf("\nPrograma finalizado!\n");
     exit(0);
 }
 
-/*##################### FUNCAO MAIN LOOP ########################*/
-int receberInput(bool res_auto, int opc_auto, int opc_manual)
-{
+/*----------------- Input -----------------*/
+int receberInput(bool res_auto, int opc_auto, int opc_manual) {
     int var_control;
-    if(res_auto)
-    {
-        var_control = rand() % opc_auto + 1;
+    if (res_auto) {
+        var_control = (rand() % opc_auto) + 1;
         printf("%d\n", var_control);
         return var_control;
-    }
-    else
-    {
-        scanf("%d", &var_control);
-        
-        //Tratamento de erro
-        if(var_control > 0 && var_control <= opc_manual)
+    } else {
+        if (scanf("%d", &var_control) != 1) {
+            int c; while ((c = getchar()) != '\n' && c != EOF) {}
+            return receberInput(res_auto, opc_auto, opc_manual);
+        }
+        if (var_control > 0 && var_control <= opc_manual)
             return var_control;
-        printf("\nResposta inválida!\n");
-        printf("Tente Novamente\n");
+        printf("\nResposta inválida! Tente Novamente.\n");
         return receberInput(res_auto, opc_auto, opc_manual);
     }
 }
 
-/* ####################### FUNÇÕES HEAP #######################################*/
-
-int criarHeap(Heap *heap, int capacidade){
+/*----------------- HEAP (min-heap por tempo_preparo_total) -----------------*/
+int criarHeap(Heap *heap, int capacidade) {
     heap->pedidos = (Pedido*) malloc(capacidade * sizeof(Pedido));
-
-    if(heap->pedidos == NULL){
-        return 0;
-    }
-
+    if (heap->pedidos == NULL) return 0;
     heap->quantidade = 0;
     heap->capacidade = capacidade;
     return 1;
 }
 
-void liberarHeap(Heap* heap){
-    free(heap->pedidos);
+void liberarHeap(Heap* heap) {
+    if (heap->pedidos) free(heap->pedidos);
     heap->pedidos = NULL;
     heap->quantidade = 0;
     heap->capacidade = 0;
 }
 
-void swap(Pedido *a, Pedido *b){
-    Pedido temp = *a;
+static void swapPedido(Pedido *a, Pedido *b) {
+    Pedido tmp = *a;
     *a = *b;
-    *b = temp;
+    *b = tmp;
 }
 
-void subirNoHeap(Heap* heap, int indice){
-    while(indice > 0 && heap->pedidos[indice].tempo_preparo_total < heap->pedidos[(indice - 1) / 2].tempo_preparo_total){
-        swap(&heap->pedidos[indice], &heap->pedidos[(indice - 1) / 2]);
-        indice = (indice - 1) / 2;
+static void subirNoHeap(Heap* heap, int indice) {
+    while (indice > 0) {
+        int pai = (indice - 1) / 2;
+        if (heap->pedidos[indice].tempo_restante_preparo < heap->pedidos[pai].tempo_restante_preparo) {
+            swapPedido(&heap->pedidos[indice], &heap->pedidos[pai]);
+            indice = pai;
+        } else break;
     }
 }
 
-void inserirPedido(Heap* heap, Pedido novoPedido){
-    if(heap->quantidade == heap->capacidade){
-        printf("A lista está cheia, não conseguimos fazer mais pedidos.\n");
+void inserirPedido(Heap* heap, Pedido novoPedido) {
+    if (heap->quantidade >= heap->capacidade) {
+        printf("Heap cheio: não foi possível inserir pedido.\n");
         return;
     }
-
-    heap->quantidade++;
-    int indice = heap->quantidade - 1;
-    heap->pedidos[indice] = novoPedido;
-    subirNoHeap(heap, indice);
+    int idx = heap->quantidade++;
+    heap->pedidos[idx] = novoPedido;
+    subirNoHeap(heap, idx);
 }
 
-
-void descerNoHeap(Heap* heap, int indice){
-    int menor = indice;
-    int esquerda = 2 * indice + 1;
-    int direita = 2 * indice + 2;
-
-    if(esquerda < heap->quantidade && heap->pedidos[esquerda].tempo_preparo_total < heap->pedidos[indice].tempo_preparo_total){
-        menor = esquerda;
-    }
-
-
-    if(direita < heap->quantidade && heap->pedidos[direita].tempo_preparo_total < heap->pedidos[menor].tempo_preparo_total){
-        menor = direita;
-    }
-
-    if(menor != indice){
-        swap(&heap->pedidos[indice], &heap->pedidos[menor]);
-        descerNoHeap(heap, menor);
+static void descerNoHeap(Heap* heap, int indice) {
+    int n = heap->quantidade;
+    while (true) {
+        int l = 2*indice + 1;
+        int r = 2*indice + 2;
+        int menor = indice;
+        if (l < n && heap->pedidos[l].tempo_restante_preparo < heap->pedidos[menor].tempo_restante_preparo) menor = l;
+        if (r < n && heap->pedidos[r].tempo_restante_preparo < heap->pedidos[menor].tempo_restante_preparo) menor = r;
+        if (menor != indice) {
+            swapPedido(&heap->pedidos[indice], &heap->pedidos[menor]);
+            indice = menor;
+        } else break;
     }
 }
 
-
-int removerItemPrioritario(Heap* heap, Pedido* pedidoRemovido){
-    if(heap->quantidade <= 0) return 0;
-
+int removerItemPrioritario(Heap* heap, Pedido* pedidoRemovido) {
+    if (heap->quantidade == 0) return 0;
     *pedidoRemovido = heap->pedidos[0];
-
-    if(heap->quantidade > 1){
-        heap->pedidos[0] = heap->pedidos[heap->quantidade - 1];
+    heap->quantidade--;
+    if (heap->quantidade > 0) {
+        heap->pedidos[0] = heap->pedidos[heap->quantidade];
         descerNoHeap(heap, 0);
     }
-    heap->quantidade--;
-
     return 1;
 }
 
-/**
- * @brief Função auxiliar recursiva para imprimir o heap como uma árvore.
- * Não precisa ser declarada no .h, pois é usada apenas por imprimirHeap.
- * @param heap Ponteiro para o heap.
- * @param indice Índice do nó atual a ser impresso.
- * @param nivel Nível de profundidade na árvore (para indentação).
- */
-void imprimirNoHeap(Heap* heap, int indice, int nivel) {
-    if (indice >= heap->quantidade) {
-        return;
-    }
-
-    // Visita o filho da direita primeiro
-    imprimirNoHeap(heap, 2 * indice + 2, nivel + 1);
-
-    // Imprime o nó atual com indentação
-    for (int i = 0; i < nivel; i++) {
-        printf("    ");
-    }
-    printf("(ID: %d T:%d)\n", heap->pedidos[indice].id, heap->pedidos[indice].tempo_preparo_total);
-
-    // Visita o filho da esquerda
-    imprimirNoHeap(heap, 2 * indice + 1, nivel + 1);
-}
-
-/**
- * @brief Imprime o estado atual do heap em dois formatos: vetor e árvore.
- * @param heap Ponteiro para o heap a ser impresso.
- */
 void imprimirHeap(Heap* heap) {
-    printf("\n--- ESTADO ATUAL DO HEAP ---\n");
     if (heap->quantidade == 0) {
-        printf("Heap Vazio.\n");
-        printf("--------------------------\n");
+        printf("Heap vazio\n");
         return;
     }
-
-    // Visão 1: Como Vetor (Layout da Memória)
-    printf("Visao Vetor [Quantidade: %d, Capacidade: %d]\n", heap->quantidade, heap->capacidade);
-    printf("[ ");
-    for (int i = 0; i < heap->quantidade; i++) {
-        printf("(ID: %d T:%d) | ", heap->pedidos[i].id, heap->pedidos[i].tempo_preparo_total);
+    printf("Heap[%d]:\n", heap->quantidade);
+    for (int i = 0; i < heap->quantidade; ++i) {
+        Pedido p = heap->pedidos[i];
+        printf("[PRIORIDADE] PEDIDO ID:%d - TempoRestante:%d\n", p.id, p.tempo_restante_preparo);
     }
-    printf("]\n\n");
-
-    // Visão 2: Como Árvore (Estrutura Lógica)
-    printf("Visao Arvore (Raiz a esquerda):\n");
-    imprimirNoHeap(heap, 0, 0); // Chama a função recursiva a partir da raiz
-    printf("--------------------------\n");
+    printf("\n");
 }
 
 
-/*################# FUNCOES LISTA DE PEDIDOS ##################################*/
-
-ListaPedidos criarLista()
-{
-    ListaPedidos lista;
-    lista.quantidade = 0;
-    lista.cabeca = NULL;
-    lista.cauda = NULL;
-    return lista;
+/*----------------- Lista de pedidos (duplamente ligada) -----------------*/
+ListaPedidos criarLista() {
+    ListaPedidos l;
+    l.cabeca = l.cauda = NULL;
+    l.quantidade = 0;
+    return l;
 }
 
-ListaPedidos removerLista(ListaPedidos lista)
-{
-    NodePedido *proxNode = lista.cabeca->prox;
-    proxNode->ante = NULL;
-    lista.cabeca->prox = NULL;
-    lista.cabeca = proxNode;
-    lista.quantidade--;
-    return lista;
+NodePedido* criarNodePedido(Pedido pedido) {
+    NodePedido *n = (NodePedido*) malloc(sizeof(NodePedido));
+    if (!n) return NULL;
+    n->pedido = pedido;
+    n->ante = n->prox = NULL;
+    return n;
 }
 
-NodePedido* criarNodePedido(Pedido pedido)
-{
-    NodePedido *novo_node = (NodePedido*) malloc(sizeof(NodePedido)); 
-    novo_node->pedido = pedido;
-    novo_node->ante = NULL;
+void adicionarListaPedidos(ListaPedidos *lista, NodePedido *novo_node) {
+    if (!lista || !novo_node) return;
     novo_node->prox = NULL;
-    return novo_node;
-}
-
-ListaPedidos adicionarLista(ListaPedidos lista, NodePedido *novo_node)
-{
-    novo_node->prox = lista.cauda;
-    novo_node->ante = NULL;
-    lista.cauda->ante = novo_node;
-    lista.cauda = novo_node;
-    lista.quantidade++;
-    return lista;
-}
-
-/*################# FUNCOES LISTA DE PEDIDOS ##################################*/
-
-ListaFuncionarios criarListaFuncionarios()
-{
-    ListaFuncionarios lista;
-    lista.quantidade = 0;
-    lista.cabeca = NULL;
-    lista.cauda = NULL;
-    return lista;
-}
-
-ListaFuncionarios removerListaFuncionario(ListaFuncionarios lista, NodeFuncionario *funcionario)
-{
-    if(lista.cabeca == funcionario)
-    {
-        lista.cabeca = funcionario->prox;
-    }
-    else if(lista.cauda == funcionario)
-    {
-        lista.cauda = funcionario->ante;
-    }
-    else
-    {
-        funcionario->ante->prox = funcionario->prox;
-        funcionario->prox->ante = funcionario->ante;
-    }
-
-    funcionario->prox = NULL;
-    funcionario->ante = NULL; 
-    lista.quantidade--;
-    return lista;
-}
-
-void adicionarListaFuncionario(ListaFuncionarios *lista, NodeFuncionario *funcionario)
-{
-    if(lista->cabeca == NULL)
-    {
-        lista->cabeca = funcionario;
-        lista->cauda = funcionario;
-    }
-    else
-    {
-        lista->cauda->prox = funcionario;
-        funcionario->ante = lista->cauda;
-        lista->cauda = funcionario;
-    }
+    novo_node->ante = lista->cauda;
+    if (lista->cauda) lista->cauda->prox = novo_node;
+    lista->cauda = novo_node;
+    if (!lista->cabeca) lista->cabeca = novo_node;
     lista->quantidade++;
 }
 
-/*################# FUNCOES IMPRIMIR #####################*/
+void removerNodePedido(ListaPedidos *lista, NodePedido *node) {
+    if (!lista || !node) return;
 
-void imprimirStatusPedido(StatusPedido status)
-{
-    switch(status) {
-        case RECEBIDO:
-            printf("Status: Recebido\n");
-            break;
-        case PREPARANDO_ITENS:
-            printf("Status: Preparando itens\n");
-            break;
-        case AGUARDANDO_MONTAGEM:
-            printf("Status: Aguardando montagem\n");
-            break;
-        case ENTREGUE:
-            printf("Status: Entregue\n");
-            break;
-        case ATRASADO:
-            printf("Status: Atrasado\n");
-            break;
-        case ARMAZENADO:
-            printf("Status: Armazenado\n");
-            break;
-        default:
-            printf("Status desconhecido\n");
-            break;
-    }
+    if (node->ante) node->ante->prox = node->prox;
+    else lista->cabeca = node->prox;
+
+    if (node->prox) node->prox->ante = node->ante;
+    else lista->cauda = node->ante;
+
+    node->prox = NULL;
+    node->ante = NULL;
+    lista->quantidade--;
 }
 
-void imprimirStatusItem(StatusItem status)
-{
-    switch (status)
-    {
-    case AGUARDANDO_PREPARADO:
-        printf("Aguardando preparo.\n");
-        break;
-    
-    case EM_PREPARO:
-        printf("Em preparo.\n");
-        break;
-
-    case PRONTO:
-        printf("Pronto.\n");
-        break;
-
-    default:
-        break;
-    }
+NodePedido* removerListaPedidos_front(ListaPedidos *lista) {
+    if (!lista || !lista->cabeca) return NULL;
+    NodePedido *ret = lista->cabeca;
+    lista->cabeca = ret->prox;
+    if (lista->cabeca) lista->cabeca->ante = NULL;
+    else lista->cauda = NULL;
+    ret->prox = ret->ante = NULL;
+    lista->quantidade--;
+    return ret;
 }
 
-void imprimirNomeDoItem(NomePedido nome)
-{
-    switch(nome) {
-        case SANDUICHE_SIMPLES:
-            printf("Sanduíche Simples:\n");
-            break;
-        case SANDUICHE_MEDIO:
-            printf("Sanduíche Médio:\n");
-            break;
-        case SANDUICHE_ELABORADO:
-            printf("Sanduíche Elaborado:\n");
-            break;
-        case BATATA_FRITA:
-            printf("Batata Frita:\n");
-            break;
-        case REFRIGERANTE:
-            printf("Refrigerante:\n");
-            break;
-        case MILK_SHAKE:
-            printf("Milk Shake:\n");
-            break;
-        case SUCO:
-            printf("Suco:\n");
-            break;
-        default:
-            printf("Pedido desconhecido:\n");
-            break;
-    }
-}
-
-void imprimirItensPedido(ItemPedido item)
-{
-    printf("\n");
-    imprimirNomeDoItem(item.nome);
-    imprimirStatusItem(item.status);
-}
-
-void imprimirPedido(Pedido pedido)
-{
-    printf("\nPEDIDO %d\n", pedido.id);
-    for(int i = 0; i<pedido.num_itens; i++)
-    {
-        imprimirItensPedido(pedido.itens[i]);
-    }
-    printf("Tempo de chegada: %ds.\n", pedido.tempo_chegada);
-    printf("Tempo de preparo total: %ds.\n", pedido.tempo_preparo_total);
-}
-
-void imprimirLista(ListaPedidos lista)
-{
-    if(lista.cabeca == NULL)
-    {
-        printf("\nA fila está vazia!\n");
+void imprimirLista(ListaPedidos lista) {
+    NodePedido *atual = lista.cabeca;
+    if (!atual) {
+        printf("Lista de pedidos vazia.\n");
         return;
     }
-    NodePedido *pivo = lista.cabeca;
-    while(pivo != NULL)
-    {
-        imprimirPedido(pivo->pedido);
+    while (atual) {
+        imprimirPedido(atual->pedido);
+        atual = atual->prox;
     }
-    printf("Quantidade de pedidos: %d\n", lista.quantidade);
 }
 
-void diminuirCicloPedidos(int ciclo, ListaPedidos *lista)
-{
-    NodePedido *pivo = lista->cauda;
-    while(pivo != NULL)
-    {
-        pivo->pedido.tempo_preparo_local-=ciclo;
-        pivo->pedido.tempo_preparo_total-=ciclo; 
-        pivo = pivo->prox;
+/*----------------- Impressão de pedidos e itens -----------------*/
+void imprimirNomeDoItem(NomePedido nome) {
+    switch (nome) {
+        case SANDUICHE_SIMPLES: printf("Sanduiche Simples"); break;
+        case SANDUICHE_MEDIO: printf("Sanduiche Medio"); break;
+        case SANDUICHE_ELABORADO: printf("Sanduiche Elaborado"); break;
+        case BATATA_FRITA: printf("Batata Frita"); break;
+        case REFRIGERANTE: printf("Refrigerante"); break;
+        case MILK_SHAKE: printf("Milk Shake"); break;
+        case SUCO: printf("Suco"); break;
+        case NADA: printf("Nada"); break;
+        default: printf("Desconhecido"); break;
     }
-    return;
 }
 
-ItemPedido receberItem(NomePedido nome)
-{
-    ItemPedido item;
-    
-    if(nome == NADA)
-    {
-        item.status = PRONTO;
-        item.tempo_preparo_total = 0;
-        item.tempo_restante_preparo = 0;
+void imprimirStatusItem(StatusItem status) {
+    switch (status) {
+        case AGUARDANDO_PREPARADO: printf(" (Aguardando)"); break;
+        case EM_PREPARO: printf(" (Em preparo)"); break;
+        case PRONTO: printf(" (Pronto)"); break;
+        default: break;
     }
-    else
-    {
-        item.status = AGUARDANDO_PREPARADO;
-        item.tempo_preparo_total = calcularPreparo(nome);
-        item.tempo_restante_preparo = item.tempo_preparo_total;
-    
-    }
-    item.nome = nome;
-    return item;
 }
 
+void imprimirPedido(Pedido pedido) {
+    printf("PEDIDO ID:%d - Itens: %d - TempoTotal:%d\n", 
+           pedido.id, pedido.num_itens, pedido.tempo_preparo_total);
+    for (int i = 0; i < pedido.num_itens; ++i) {
+        printf("  - ");
+        imprimirNomeDoItem(pedido.itens[i].nome);
+        imprimirStatusItem(pedido.itens[i].status);
+        printf(" (t:%d)\n", pedido.itens[i].tempo_preparo_total);
+    }
+}
 
-NodePedido *receberPedido(bool res_auto)
-{
-    Pedido novo_pedido;
-    int item_comer, item_beber;
-    novo_pedido.status = RECEBIDO;
-    for(int max_itens = 2; max_itens > 0; max_itens--){
-        printf("\nEscolha ate 4 itens (2 de comer e 2 de beber)\n");
-        printf("\n\n==== Itens de Comer ====\n");
-        printf(" 1 - Sanduiche Simples\n 2 - Sanduiche Medio\n 3 - Sanduiche Elaborado\n 4 - Batata Frita\n 5 - Nao quero nada\n");
-        printf("Resposta: ");
-        item_comer = receberInput(res_auto, 5, 5);
-        item_comer--; //Tornar resposta compatível com a lista
-        if (item_comer == 4)
-        {
-            item_comer = NADA;
+/*----------------- Fila de Prioridade -----------------*/
+void verificarEPriorizarPedidos(Locais *local, int tempo_atual) {
+    NodePedido *atual = local->fila_espera.cabeca;
+    while (atual != NULL) {
+        NodePedido *proximo = atual->prox;
+        if ((tempo_atual - atual->pedido.tempo_chegada) >= 240) { // 4 minutos
+            printf("Pedido ID:%d movido para PRIORIDADE (esperou 4min)\n", atual->pedido.id);
+            removerListaPedidos_front(&local->fila_espera);
+            inserirPedido(&local->heap, atual->pedido);
+            free(atual);
         }
-        
-        printf("\n\n==== Itens de Beber ====\n");
-        printf("1 - Refrigerante\n 2 - Milk-Shake\n 3 - Suco\n 4 - Nao quero nada\n");
-        printf("Resposta: ");
-        
-        item_beber = receberInput(res_auto, 4, 4);
-        item_beber += 4;//Tornar resposta compatível com a lista     
-        int i = 4 / max_itens - 1;
-        novo_pedido.itens[i] = receberItem(item_comer);
-        novo_pedido.itens[i-1] = receberItem(item_beber);
-    }
-    NodePedido *node = criarNodePedido(novo_pedido);
-    return node; //Retorna o ponteiro para o node do pedido
-} 
-
-/*#################### SEM DEFINICAO ########################*/
-
-int calcularPreparo(NomePedido pedido) //Retorna o tempo de preparo em segundos
-{
-    switch(pedido)
-    {
-        case BATATA_FRITA:
-            return 190; // 3 min e 10 seg
-
-        case SANDUICHE_SIMPLES:
-            return 58;
-
-        case SANDUICHE_MEDIO:
-            return 88; // 1 min e 28 seg
-
-        case SANDUICHE_ELABORADO:
-            return 105; // 1 min e 45 seg
-
-        case REFRIGERANTE:
-            return 5;
-
-        case SUCO:
-            return 38;
-
-        case MILK_SHAKE:
-            return 60; // 1 min
-        case NADA:
-            return 0;
-        default:
-            return 0;
+        atual = proximo;
     }
 }
 
-NodeFuncionario* encontrarFuncionario(ListaFuncionarios *lista, Habilidade habilidade_requerida, Locais *local)
-{
-    if(lista->cabeca == NULL)
-    {
-        return NULL;
-    }
+/*----------------- Lista de Itens para Preparo -----------------*/
+ListaItemPreparo criarListaItemPreparo() {
+    ListaItemPreparo l;
+    l.cabeca = l.cauda = NULL;
+    l.quantidade = 0;
+    return l;
+}
 
-    NodeFuncionario *pivo;
+NodeItemPreparo* criarNodeItemPreparo(ItemPreparo item) {
+    NodeItemPreparo *n = (NodeItemPreparo*) malloc(sizeof(NodeItemPreparo));
+    if (!n) return NULL;
+    n->item = item;
+    n->ante = n->prox = NULL;
+    return n;
+}
+
+void adicionarListaItemPreparo(ListaItemPreparo *lista, NodeItemPreparo *novo_node) {
+    if (!lista || !novo_node) return;
+    novo_node->prox = NULL;
+    novo_node->ante = lista->cauda;
+    if (lista->cauda) lista->cauda->prox = novo_node;
+    lista->cauda = novo_node;
+    if (!lista->cabeca) lista->cabeca = novo_node;
+    lista->quantidade++;
+}
+
+NodeItemPreparo* removerListaItemPreparo_front(ListaItemPreparo *lista) {
+    if (!lista || !lista->cabeca) return NULL;
+    NodeItemPreparo *ret = lista->cabeca;
+    lista->cabeca = ret->prox;
+    if (lista->cabeca) lista->cabeca->ante = NULL;
+    else lista->cauda = NULL;
+    ret->prox = ret->ante = NULL;
+    lista->quantidade--;
+    return ret;
+}
+
+// ======================== FILA DE MONTAGEM ========================
+
+bool todosItensProntos(Pedido *pedido) {
+    for (int i = 0; i < pedido->num_itens; i++) {
+        // Ignora itens "NADA"
+        if (pedido->itens[i].nome == NADA) continue;
+        
+        if (pedido->itens[i].status != PRONTO) {
+            return false; // Encontrou um item que ainda não está pronto
+        }
+    }
+    return true; // Todos os itens estão prontos
+}
+
+void verificarPedidosProntos(ListaPedidos *pedidos_em_preparo, Locais *local_montagem) {
+    NodePedido *atual = pedidos_em_preparo->cabeca;
+    while (atual != NULL) {
+        NodePedido *proximo = atual->prox; // Guarda o próximo para o caso de remoção
+
+        if (todosItensProntos(&atual->pedido)) {
+            printf("MONTAGEM: Pedido %d esta com todos os itens prontos. Movendo para a fila de montagem.\n", atual->pedido.id);
+
+            // Remove o pedido da lista de "em preparo"
+            removerNodePedido(pedidos_em_preparo, atual);
+
+            // Adiciona na fila de espera da montagem
+            adicionarListaPedidos(&local_montagem->fila_espera, atual);
+        }
+        atual = proximo;
+    }
+}
+
+void processarMontagem(Locais *local_montagem, ListaFuncionarios *reserva, ListaPedidos *pedidos_entregues, int ciclo) {
+    NodeFuncionario *func_atual = local_montagem->funcionario.cabeca;
     
-    while(pivo != NULL)
-    {
-        for(int i = 1; i <= 3; i++)
-        {
-            if(pivo->funcionario.num_habilidade == i) //Escolhe funcionário capaz de executar menos funções
-            {
-                for(int j = 0; j < pivo->funcionario.num_habilidade; j++)
-                {
-                    if(pivo->funcionario.habilidades[j] == habilidade_requerida)
-                    {
-                        pivo->funcionario.status = OCUPADO;
-                        printarLocalFuncionario(pivo->funcionario, local->nome);
-                        pivo->funcionario.local_atual = local->nome;
-                        return pivo;
-                    }
-                }
+    while (func_atual != NULL) {
+        NodeFuncionario *proximo_func = func_atual->prox;
+        
+        if (func_atual->funcionario.status == OCUPADO && func_atual->funcionario.pedido_trabalhado != NULL) {
+            NodePedido *pedido_em_montagem = func_atual->funcionario.pedido_trabalhado;
+            pedido_em_montagem->pedido.tempo_preparo_local -= ciclo;
+
+            if (pedido_em_montagem->pedido.tempo_preparo_local <= 0) {
+                // --- PEDIDO ENTREGUE! ---
+                pedido_em_montagem->pedido.status = ENTREGUE;
+                printf("ENTREGA: Pedido %d foi montado e ENTREGUE!\n", pedido_em_montagem->pedido.id);
+                
+                // Move o pedido para a lista de entregues
+                adicionarListaPedidos(pedidos_entregues, pedido_em_montagem);
+
+                // Libera o funcionário
+                liberarFuncionario(func_atual, &local_montagem->funcionario, reserva);
             }
         }
-        pivo = pivo->prox;
-    }
-
-    return NULL;
-}
-
-ListaItemPreparo* criarListaItemPreparo() 
-{
-    ListaItemPreparo *lista = (ListaItemPreparo*) malloc(sizeof(ListaItemPreparo));
-
-    if (lista != NULL) {
-        lista->cabeca = NULL;
-        lista->cauda = NULL;
-    }
-
-    return lista;
-}
-
-void inserirListaItemPreparo(ListaItemPreparo *lista, NodeItemPreparo *novoNode) 
-{
-    novoNode->ante = NULL;
-
-    if (lista->cabeca == NULL) 
-    {
-        novoNode->prox = NULL;
-        lista->cabeca = novoNode;
-        lista->cauda = novoNode;
-    } 
-    else 
-    {
-        novoNode->prox = lista->cauda;
-        lista->cauda->ante = novoNode;
-        lista->cauda = novoNode;
+        func_atual = proximo_func;
     }
 }
 
-void removerListaItemPreparo(ListaItemPreparo *lista, NodeItemPreparo *nodeParaRemover)
-{
-    if (nodeParaRemover == lista->cabeca) 
-    {
-        lista->cabeca = nodeParaRemover->ante;
-    }
-    else if (nodeParaRemover == lista->cauda) 
-    {
-        lista->cauda = nodeParaRemover->prox;
-    }
-    else
-    {
-        nodeParaRemover->ante->prox = nodeParaRemover->prox;
-        nodeParaRemover->prox->ante = nodeParaRemover->ante;
-    }
-    // Isola o nó removido
-    nodeParaRemover->prox = NULL;
-    nodeParaRemover->ante = NULL;
-}
-
-
-/*
-int tempo_restante(Pedido *pedido, Funcionario funcionario[], Equipamento equipamentos[])
-{
-    int tempo_preparo = pedido->itens[0].tempo_preparo_total;
-    int local_vago;
-    int tempo_funcionario;
-
-
-    - tempo_preparo = tempo que ele demora para ser preparado
-    - local_vago = tempo onde o local onde ele será preparado estará vazio 
-    - tempo_funcionario = menor tempo em que teremos um funcionário apto a preparar;
-
-    if (tempo_funcionario > local_vago)
-    {
-        tempo_restante = tempo_preparo + local_vago; 
-    }
-    else
-    {
-        tempo_restante = tempo_preparo + tempo_funcionario;
-    }
-
-    - Faça isso com todos os outros itens da lista:
-    - Puxa um item do pedido;
-    - tempo_preparo = tempo que ele demora para ser preparado
-    - local_vago = tempo onde o local onde ele será preparado estará vazio 
-    - tempo_funcionario = menor tempo em que teremos um funcionário apto a
-
-    if (tempo_funcionario > local_vago)
-    {
-        if(tempo_restante < tempo_preparo + local_vago) tempo_restante = tempo_preparo + local_vago; 
+void montarBandeja(Locais *local_montagem, ListaFuncionarios *reserva) {
+    // Enquanto houver pedidos na fila e for possível alocar funcionários
+    while (local_montagem->fila_espera.cabeca != NULL) {
         
-    }
-    else
-    {
-        if(tempo_restante < tempo_preparo + tempo_funcionario) tempo_restante = tempo_preparo + tempo_funcionario;
-    }
+        // Tenta encontrar um funcionário livre com a habilidade certa
+        NodeFuncionario *montador = encontrarEAlocarFuncionario(reserva, HABILIDADE_MONTAGEM);
 
-    return 0;
+        if (montador == NULL) {
+            break; // Se não há montador, não pode iniciar mais tarefas
+        }
+
+        // Pega o primeiro pedido da fila de espera
+        NodePedido *pedido_para_montar = removerListaPedidos_front(&local_montagem->fila_espera);
+        
+        // Calcula o tempo de montagem
+        int tempo_montagem = 30; // Tempo base
+        for (int i = 0; i < pedido_para_montar->pedido.num_itens; i++) {
+            if (pedido_para_montar->pedido.itens[i].nome == REFRIGERANTE) {
+                tempo_montagem += 5; // Adiciona 5s para o refrigerante
+                break; // Adiciona apenas uma vez
+            }
+        }
+        pedido_para_montar->pedido.tempo_preparo_local = tempo_montagem;
+        
+        // Aloca a tarefa ao funcionário
+        montador->funcionario.pedido_trabalhado = pedido_para_montar;
+        montador->funcionario.local_atual = MONTAR_BANDEJAS;
+        adicionarListaFuncionario(&local_montagem->funcionario, montador);
+
+        printf("MONTAGEM: Funcionario %d iniciou a montagem do Pedido %d (duracao: %ds).\n", 
+               montador->funcionario.id, pedido_para_montar->pedido.id, tempo_montagem);
     }
-*/
+}
 
-// Funções relacionados a bandeja
+/*----------------- Funções de Funcionários -----------------*/
+ListaFuncionarios criarListaFuncionarios() {
+    ListaFuncionarios l;
+    l.cabeca = l.cauda = NULL;
+    l.quantidade = 0;
+    return l;
+}
 
-NodeItemPreparo *criarNodeItemPreparo(ItemPreparo item)
-{
-    NodeItemPreparo *novo_node = (NodeItemPreparo*) malloc(sizeof(NodeItemPreparo)); 
-    novo_node->item = item;
+// Função auxiliar para criar um nó de funcionário
+static NodeFuncionario* criarFuncionario(int id, Habilidade hab1, Habilidade hab2, Habilidade hab3) {
+    NodeFuncionario* novo_node = (NodeFuncionario*) malloc(sizeof(NodeFuncionario));
+    if (!novo_node) return NULL;
+
+    Funcionario f;
+    f.id = id;
+    f.num_habilidade = 0;
+    if (hab1 != NADA) f.habilidades[f.num_habilidade++] = hab1;
+    if (hab2 != NADA) f.habilidades[f.num_habilidade++] = hab2;
+    if (hab3 != NADA) f.habilidades[f.num_habilidade++] = hab3;
+    
+    f.status = LIVRE;
+    f.local_atual = RESERVA;
+    f.pedido_trabalhado = NULL;
+
+    novo_node->funcionario = f;
     novo_node->ante = NULL;
     novo_node->prox = NULL;
+    
     return novo_node;
 }
 
-void separaPedidos(Equipamento equipamentos[], NodePedido *node_pedido)
-{
-    Pedido *pedido = &node_pedido->pedido;
-    for(int i = 0; i<4; i++)
-    {
-        ItemPreparo item;
-        item.pedido = pedido;
-        item.nome = pedido->itens[i].nome;
-        item.tempo_preparo = pedido->itens[i].tempo_preparo_total;
-        item.status = AGUARDANDO_PREPARADO;
-        NomePedido np = item.nome;
-        NodeItemPreparo *clone = criarNodeItemPreparo(item);
-        if(item.status == AGUARDANDO_PREPARADO)
-        {
-            if(np == SANDUICHE_SIMPLES || np == SANDUICHE_MEDIO || np == SANDUICHE_ELABORADO)
-            {
-                inserirListaItemPreparo(&equipamentos[CHAPA].fila_espera, clone);
-                printf("Item de sanduíche enviado para a fila de sanduíches (pedido %d).\n", pedido->id);
-            }
-            else if(np == REFRIGERANTE)
-            {
-                inserirListaItemPreparo(&equipamentos[PENEIRA].fila_espera, clone);
-                printf("Refrigerante enviado para a fila de bebidas (pedido %d).\n", pedido->id);
-            }
-            else if(np == MILK_SHAKE)
-            {
-                inserirListaItemPreparo(&equipamentos[LIQUIDIFICADOR_MILK_SHAKE].fila_espera, clone);
-                printf("Milk-shake enviado para a fila de milk-shakes (pedido %d).\n", pedido->id);
-            }
-            else if(np == SUCO)
-            {
-                inserirListaItemPreparo(&equipamentos[LIQUIDIFICADOR_SUCO].fila_espera, clone);
-                printf("Suco enviado para a fila de sucos (pedido %d).\n", pedido->id);
-            }
-        }   
-    }
+// Popula a lista de funcionários com a equipe inicial
+void inicializarFuncionarios(ListaFuncionarios *lista) {
+    printf("Inicializando equipe de funcionarios...\n");
+    // 2 Caixas
+    adicionarListaFuncionario(lista, criarFuncionario(1, HABILIDADE_CAIXA, NADA, NADA));
+    adicionarListaFuncionario(lista, criarFuncionario(2, HABILIDADE_CAIXA, NADA, NADA));
+    
+    // 2 Separadores
+    adicionarListaFuncionario(lista, criarFuncionario(3, HABILIDADE_SEPARACAO, NADA, NADA));
+    adicionarListaFuncionario(lista, criarFuncionario(4, HABILIDADE_SEPARACAO, NADA, NADA));
+
+    // 4 Chapistas (Sanduíches)
+    adicionarListaFuncionario(lista, criarFuncionario(5, HABILIDADE_SANDUICHE, NADA, NADA));
+    adicionarListaFuncionario(lista, criarFuncionario(6, HABILIDADE_SANDUICHE, NADA, NADA));
+    adicionarListaFuncionario(lista, criarFuncionario(7, HABILIDADE_SANDUICHE, NADA, NADA));
+    adicionarListaFuncionario(lista, criarFuncionario(8, HABILIDADE_SANDUICHE, NADA, NADA));
+
+    // 2 Fritadores (Batata)
+    adicionarListaFuncionario(lista, criarFuncionario(9, HABILIDADE_BATATA, NADA, NADA));
+    adicionarListaFuncionario(lista, criarFuncionario(10, HABILIDADE_BATATA, NADA, NADA));
+
+    // 2 Preparadores de Suco
+    adicionarListaFuncionario(lista, criarFuncionario(11, HABILIDADE_SUCO, NADA, NADA));
+    adicionarListaFuncionario(lista, criarFuncionario(12, HABILIDADE_SUCO, NADA, NADA));
+
+    // 2 Preparadores de Bebidas (Milk-shake/Refri)
+    adicionarListaFuncionario(lista, criarFuncionario(13, HABILIDADE_BEBIDA, NADA, NADA));
+    adicionarListaFuncionario(lista, criarFuncionario(14, HABILIDADE_BEBIDA, NADA, NADA));
+
+    // 2 Montadores
+    adicionarListaFuncionario(lista, criarFuncionario(15, HABILIDADE_MONTAGEM, NADA, NADA));
+    adicionarListaFuncionario(lista, criarFuncionario(16, HABILIDADE_MONTAGEM, NADA, NADA));
+
+    printf("%d funcionarios contratados e na reserva!\n", lista->quantidade);
 }
 
-void separador(Locais locais[], ListaFuncionarios *reserva_funcionarios, Equipamento equipamentos[], int ciclo)
-{
-    Locais *separador_local = &locais[SEPARADOR];
-    
-    NodePedido *pivo = locais[SEPARADOR].fila_espera.cauda;
-    while(pivo != NULL)
-    {
-        removerLista(locais[SEPARADOR].fila_espera);
-        inserirPedido(&locais[SEPARADOR].heap, pivo->pedido);
-        pivo = pivo->prox;
+
+void adicionarListaFuncionario(ListaFuncionarios *lista, NodeFuncionario *novo_node) {
+    if (!lista || !novo_node) return;
+    novo_node->prox = NULL;
+    novo_node->ante = lista->cauda;
+    if (lista->cauda) lista->cauda->prox = novo_node;
+    lista->cauda = novo_node;
+    if (!lista->cabeca) lista->cabeca = novo_node;
+    lista->quantidade++;
+}
+
+NodeFuncionario* removerNodeFuncionario(ListaFuncionarios *lista, NodeFuncionario *node_para_remover) {
+    if (!lista || !node_para_remover) return NULL;
+    if (node_para_remover->ante) node_para_remover->ante->prox = node_para_remover->prox;
+    else lista->cabeca = node_para_remover->prox;
+    if (node_para_remover->prox) node_para_remover->prox->ante = node_para_remover->ante;
+    else lista->cauda = node_para_remover->ante;
+    node_para_remover->ante = NULL;
+    node_para_remover->prox = NULL;
+    lista->quantidade--;
+    return node_para_remover;
+}
+
+NodeFuncionario* encontrarEAlocarFuncionario(ListaFuncionarios *reserva, Habilidade habilidade) {
+    NodeFuncionario *atual = reserva->cabeca;
+    while (atual) {
+        if (atual->funcionario.status == LIVRE) {
+            for (int i = 0; i < atual->funcionario.num_habilidade; i++) {
+                if (atual->funcionario.habilidades[i] == habilidade) {
+                    atual->funcionario.status = OCUPADO;
+                    return removerNodeFuncionario(reserva, atual);
+                }
+            }
+        }
+        atual = atual->prox;
     }
+    return NULL;
+}
 
-    NodeFuncionario *f = encontrarFuncionario(reserva_funcionarios, HABILIDADE_SEPARACAO, SEPARADOR);
-            
-    diminuirCicloPedidos(ciclo, &locais[SEPARADOR].fila_espera);
-    
-    //Diminuir 
-/*
-            pedido_trabalhado->pedido.tempo_preparo_local -= ciclo;
-            printf("Separador: Funcionario %d trabalhando no pedido %d. Tempo restante: %d\n", func_pivo->funcionario.id, pedido_trabalhado->pedido.id, pedido_trabalhado->pedido.tempo_preparo_local);
+void liberarFuncionario(NodeFuncionario *node, ListaFuncionarios *origem, ListaFuncionarios *destino_reserva) {
+    if (!node || !destino_reserva) return;
+    if (origem) {
+        removerNodeFuncionario(origem, node);
+    }
+    printf("Funcionario %d finalizou a tarefa e voltou para a reserva.\n", node->funcionario.id);
+    node->funcionario.status = LIVRE;
+    node->funcionario.local_atual = RESERVA;
+    node->funcionario.pedido_trabalhado = NULL;
+    adicionarListaFuncionario(destino_reserva, node);
+}
 
-            // Se o tempo acabou, a separação foi concluída
-            if (pedido_trabalhado->pedido.tempo_preparo_local <= 0)
-            
-                printf("Separador: Funcionario %d finalizou a separacao do pedido %d.\n", func_pivo->funcionario.id, pedido_trabalhado->pedido.id);
+/*----------------- Lógica da Lanchonete -----------------*/
+
+void processarRecepcao(Locais *local_recepcao, Locais *local_separador, ListaFuncionarios *reserva, int ciclo) {
+    NodeFuncionario *func_atual = local_recepcao->funcionario.cabeca;
+    while (func_atual != NULL) {
+        NodeFuncionario *proximo_func = func_atual->prox;
+        if (func_atual->funcionario.status == OCUPADO && func_atual->funcionario.pedido_trabalhado != NULL) {
+            NodePedido *pedido_atendido = func_atual->funcionario.pedido_trabalhado;
+            pedido_atendido->pedido.tempo_preparo_local -= ciclo;
+
+            if (pedido_atendido->pedido.tempo_preparo_local <= 0) {
+                printf("RECEPCAO: Atendimento do Pedido %d concluido. Movendo para a separacao.\n", pedido_atendido->pedido.id);
                 
-                // "Separa Pedido()": Envia cada item para a fila do seu respectivo equipamento
-                separaPedidos(equipamentos, pedido_trabalhado);
-
-                // Libera o nó do pedido que estava sendo trabalhado, pois ele já foi dividido
-                free(pedido_trabalhado);
-
-                // "Libera Funcionário()": Remove o funcionário da lista de ativos do separador
-                separador_local->funcionario = removerListaFuncionario(separador_local->funcionario, func_pivo);
-                // E o devolve para a lista de reserva
-                liberarFuncionario(reserva_funcionarios, func_pivo);
-
-        func_pivo = proximo_func;
-    }
-*/
-void liberarFuncionario(ListaFuncionarios *reserva, NodeFuncionario *node_funcionario)
-{
-    node_funcionario->funcionario.status = LIVRE;
-    printarLocalFuncionario(node_funcionario->funcionario, RESERVA);
-    node_funcionario->funcionario.local_atual = RESERVA;
-    adicionarListaFuncionario(reserva, node_funcionario);
-    node_funcionario->funcionario.pedido_trabalhado = NULL;
-}
-
-
-bool todosItensProntos(Pedido pedido) {
-    for(int i = 0; i < pedido.num_itens; i++) {
-        if(pedido.itens[i].status != PRONTO) {
-            return false;
+                // Remove o pedido do funcionário e move para a fila do separador
+                func_atual->funcionario.pedido_trabalhado = NULL;
+                adicionarListaPedidos(&local_separador->fila_espera, pedido_atendido);
+                
+                liberarFuncionario(func_atual, &local_recepcao->funcionario, reserva);
+            }
         }
-    }
-    return true;
-}
-
-
-void atualizarPedidosParaMontagem(ListaPedidos *lista, ListaPedidos *fila_montagem) {
-    NodePedido *pivo = lista->cabeca;
-    while(pivo != NULL) {
-        if(todosItensProntos(pivo->pedido) && pivo->pedido.status != AGUARDANDO_MONTAGEM) {
-            pivo->pedido.status = AGUARDANDO_MONTAGEM;
-            *fila_montagem = adicionarLista(*fila_montagem, pivo);
-            printf("pedido %d pronto para montagem!\n", pivo->pedido.id);
-        }
-        pivo = pivo->prox;
+        func_atual = proximo_func;
     }
 }
 
-void printarLocal(NomeLocal local)
-{
-    switch(local)
-    {
-        case RECEPCAO:
-            printf("Recepção");
-            return;
-        case MONTAR_BANDEJAS:
-            printf("Montador de bandejas");
-            return;
-        case SEPARADOR:
-            printf("Separador");
-            return;
-        case CAIXA:
-            printf("Caixa");
-            return;
-        case RESERVA:
-            printf("Reserva");
-            return;
-    }
-}
 
-void printarLocalFuncionario(Funcionario funcionario, NomeLocal novo_local)
-{
-    
-    printf("Funcionario %d saiu de: ", funcionario.id);
-    printarLocal(funcionario.local_atual);
-    printf("e foi para: ");
-    printarLocal(novo_local);
-    printf(".\n");
-}
+void distribuirItens(NodePedido *pedido_node, Equipamento equipamentos[]) {
+    if (!pedido_node) return;
+    printf("SEPARADOR: Distribuindo itens do Pedido %d para as filas dos equipamentos.\n", pedido_node->pedido.id);
 
-/*
-void montarBandeja(Locais *m, ListaPedidos *reserva, int ciclo) {
-    if(m->fila_espera.cabeca == NULL) return;
+    for (int i = 0; i < pedido_node->pedido.num_itens; i++) {
+        ItemPedido *item_original = &pedido_node->pedido.itens[i];
+        if (item_original->nome == NADA) continue;
 
-    NodeFuncionario *pivo = m->funcionario.cauda;
-    NodePedido *pedidoNode = pivo->funcionario.pedido_trabalhado;
-    Pedido *pedido = &pedidoNode->pedido;
-
-    
-    while(pivo != NULL)
-    {
-        pedido->tempo_preparo_local-=ciclo;
-        if(pedido->tempo_preparo_local == 0)
-        {
-            printf("pedido %d foi ENTREGUE!\n", pedido->id);
-            m->funcionario = removerListaFuncionario(m->funcionario, pivo);                    
-        }
-        pivo = pivo->prox;
-    }
-
-    pedidoNode = m->fila_espera.cabeca;
-    pedido = &pedidoNode->pedido;
-
-    NodeFuncionario *montador = encontrarFuncionario(reserva, HABILIDADE_MONTAGEM, m);
-    while(montador != NULL && pedidoNode != NULL)
-    {
-        montador = encontrarFuncionario(reserva, HABILIDADE_CAIXA, m);
-        printf("Funcionario %d iniciou montagem do pedido %d.\n", montador->funcionario.id, pedido->id);
-        montador->funcionario.pedido_trabalhado = pedido;
-        pedido->tempo_preparo_local = 30; // "tempo de preparo"
-    }   
-    pedido->status = ENTREGUE; //pedido montado
-}
-
-ListaFuncionarios inicializarFuncionarios()
-{
-    ListaFuncionarios lista_reserva = criarListaFuncionarios();
-
-    Funcionario equipe_inicial[] = {
-        {1, {HABILIDADE_CAIXA}, 1},
-        {2, {HABILIDADE_MONTAGEM}, 1},
-        {3, {HABILIDADE_SEPARACAO}, 1},
-        {4, {HABILIDADE_SANDUICHE, HABILIDADE_BATATA}, 2},
-        {5, {HABILIDADE_SANDUICHE, HABILIDADE_MONTAGEM}, 2},
-        {6, {HABILIDADE_BEBIDA, HABILIDADE_SUCO}, 2},
-        {7, {HABILIDADE_CAIXA, HABILIDADE_SEPARACAO, HABILIDADE_MONTAGEM}, 3}
-    };
-
-    int num_total_funcionarios = sizeof(equipe_inicial) / sizeof(Funcionario);
-    printf("Inicializando %d funcionarios...\n", num_total_funcionarios);
-
-    for (int i = 0; i < num_total_funcionarios; i++)
-    {
-        NodeFuncionario *novo_node = (NodeFuncionario*) malloc(sizeof(NodeFuncionario));
-        if (novo_node == NULL) {
-            printf("Erro de alocacao de memoria para o funcionario %d!\n", i + 1);
+        if (item_original->nome == REFRIGERANTE) {
+            item_original->status = PRONTO;
+            printf("  -> Item 'Refrigerante' (Pedido %d) é instantâneo.\n", pedido_node->pedido.id);
             continue;
         }
 
-        novo_node->funcionario = equipe_inicial[i];
-        novo_node->funcionario.status = LIVRE; 
-        novo_node->funcionario.local_atual = RESERVA;
-        novo_node->funcionario.pedido_trabalhado = NULL; 
+        ItemPreparo item_para_fila;
+        item_para_fila.nome = item_original->nome;
+        item_para_fila.tempo_preparo_total = item_original->tempo_preparo_total;
+        item_para_fila.tempo_restante_preparo = item_original->tempo_preparo_total;
+        item_para_fila.status = AGUARDANDO_PREPARADO;
+        item_para_fila.pedido_pai = &pedido_node->pedido;
+        item_para_fila.item_original = item_original;
 
-        novo_node->ante = NULL;
-        novo_node->prox = NULL;
+        NodeItemPreparo *node_item = criarNodeItemPreparo(item_para_fila);
+        NomeEquipamento destino;
 
-        adicionarListaFuncionario(&lista_reserva, novo_node);
+        switch (item_original->nome) {
+            case SANDUICHE_SIMPLES: case SANDUICHE_MEDIO: case SANDUICHE_ELABORADO: destino = CHAPA; break;
+            case BATATA_FRITA: destino = PENEIRA; break;
+            case MILK_SHAKE: destino = LIQUIDIFICADOR_MILK_SHAKE; break;
+            case SUCO: destino = LIQUIDIFICADOR_SUCO; break;
+            default: free(node_item); continue;
+        }
+        
+        adicionarListaItemPreparo(&equipamentos[destino].fila_espera, node_item);
+        printf("  -> Item '");
+        imprimirNomeDoItem(item_original->nome);
+        printf("' (Pedido %d) enviado para a fila do equipamento %d.\n", pedido_node->pedido.id, destino);
     }
-    
-    printf("Equipe de funcionarios criada e na reserva.\n");
-    return lista_reserva;
 }
 
-void recepcao(Locais *r, int ciclo, int tempo_global, bool res_auto, ListaFuncionarios *reserva, ListaPedidos *separador)
-{
-    NodeFuncionario *recepcionista = encontrarFuncionario(reserva, HABILIDADE_CAIXA, RECEPCAO);
-    if(recepcionista == NULL)
-    {
-        printf("\nNão há recepcionístas disponíveis no momento!\n");
+void processarSeparador(Locais *local_separador, Equipamento equipamentos[], ListaFuncionarios *reserva, ListaPedidos *pedidos_em_preparo, int ciclo) {
+    NodeFuncionario *func_atual = local_separador->funcionario.cabeca;
+    while (func_atual != NULL) {
+        NodeFuncionario *proximo_func = func_atual->prox;
+        if (func_atual->funcionario.status == OCUPADO && func_atual->funcionario.pedido_trabalhado != NULL) {
+            NodePedido *pedido_sendo_separado = func_atual->funcionario.pedido_trabalhado;
+            pedido_sendo_separado->pedido.tempo_preparo_local -= ciclo;
+
+            if (pedido_sendo_separado->pedido.tempo_preparo_local <= 0) {
+                printf("SEPARADOR: Funcionario %d finalizou a separacao do Pedido %d.\n", func_atual->funcionario.id, pedido_sendo_separado->pedido.id);
+                
+                distribuirItens(pedido_sendo_separado, equipamentos);
+                pedido_sendo_separado->pedido.status = PREPARANDO_ITENS;
+                
+                func_atual->funcionario.pedido_trabalhado = NULL;
+                adicionarListaPedidos(pedidos_em_preparo, pedido_sendo_separado);
+                
+                liberarFuncionario(func_atual, &local_separador->funcionario, reserva);
+            }
+        }
+        func_atual = proximo_func;
     }
-    else
-    {
-        NodePedido *novo_pedido = receberPedido(res_auto); 
-        recepcionista->funcionario.pedido_trabalhado = novo_pedido;
-        adicionarListaFuncionario(&r->funcionario, recepcionista);
-        novo_pedido->pedido.tempo_preparo_local = 30; //30 segundos para a recepção
-        r->pedido_sendo_feitos = adicionarLista(r->pedido_sendo_feitos, novo_pedido);
+}
+
+void separador(Locais *local_separador, ListaFuncionarios *reserva) {
+    if (local_separador->fila_espera.cabeca == NULL) return;
+
+    NodeFuncionario *separador_func = encontrarEAlocarFuncionario(reserva, HABILIDADE_SEPARACAO);
+
+    if (separador_func != NULL) {
+        NodePedido *pedido_para_separar = removerListaPedidos_front(&local_separador->fila_espera);
+        if (pedido_para_separar == NULL) {
+            adicionarListaFuncionario(reserva, separador_func);
+            separador_func->funcionario.status = LIVRE;
+            return;
+        }
+
+        printf("SEPARADOR: Funcionario %d iniciou a separacao do Pedido %d (duracao: 30s).\n", 
+               separador_func->funcionario.id, pedido_para_separar->pedido.id);
+
+        pedido_para_separar->pedido.tempo_preparo_local = 30;
+        separador_func->funcionario.pedido_trabalhado = pedido_para_separar;
+        separador_func->funcionario.local_atual = SEPARADOR;
+        adicionarListaFuncionario(&local_separador->funcionario, separador_func);
     }
-    diminuirCicloPedidos(ciclo, &r->pedido_sendo_feitos); //Como é a fila de espera, considera-se que ele já vai ser atendido.
-    if(r->funcionario.cabeca->funcionario.pedido_trabalhado->pedido.tempo_preparo_local == 0)
-    {
-        NodeFuncionario *funcionario_livre;
-        r->funcionario = removerListaFuncionario(r->funcionario, funcionario_livre);
-        adicionarLista(&separador, funcionario_livre->funcionario.pedido_trabalhado);
-        liberarFuncionario(reserva, funcionario_livre);
-        
-    } //Entende-se que a cabeça da fila sempre será preparada primeiro
+}
+
+void processarEquipamentos(Equipamento equipamentos[], ListaFuncionarios *reserva, int ciclo) {
+    for (int i = 0; i < 4; i++) {
+        for (int j = 0; j < equipamentos[i].capacidade_maxima; j++) {
+            if (equipamentos[i].itens_em_preparo[j].nome != NADA) {
+                ItemPreparo *item = &equipamentos[i].itens_em_preparo[j];
+                item->tempo_restante_preparo -= ciclo;
+
+                if (item->tempo_restante_preparo <= 0) {
+                    item->status = PRONTO;
+                    item->item_original->status = PRONTO;
+
+                    printf("EQUIPAMENTO %d: Item '", i);
+                    imprimirNomeDoItem(item->nome);
+                    printf("' (Pedido %d) ficou PRONTO.\n", item->pedido_pai->id);
+
+                    liberarFuncionario(equipamentos[i].funcionarios_alocados[j], NULL, reserva);
+                    equipamentos[i].funcionarios_alocados[j] = NULL;
+                    
+                    item->nome = NADA;
+                    equipamentos[i].capacidade_usada--;
+                }
+            }
+        }
+    }
+}
+
+void operarEquipamentos(Equipamento equipamentos[], ListaFuncionarios *reserva) {
+    for (int i = 0; i < 4; i++) {
+        while (equipamentos[i].capacidade_usada < equipamentos[i].capacidade_maxima &&
+            equipamentos[i].fila_espera.cabeca != NULL) {
+            
+            Habilidade habilidade_necessaria;
+            switch (equipamentos[i].nome) {
+                case CHAPA: habilidade_necessaria = HABILIDADE_SANDUICHE; break;
+                case PENEIRA: habilidade_necessaria = HABILIDADE_BATATA; break;
+                case LIQUIDIFICADOR_SUCO: habilidade_necessaria = HABILIDADE_SUCO; break;
+                case LIQUIDIFICADOR_MILK_SHAKE: habilidade_necessaria = HABILIDADE_BEBIDA; break;
+                default: habilidade_necessaria = NADA; break; // Adicionado para segurança
+            }
+
+            NodeFuncionario *operador = encontrarEAlocarFuncionario(reserva, habilidade_necessaria);
+            if (operador == NULL) break;
+
+            NodeItemPreparo *item_node = removerListaItemPreparo_front(&equipamentos[i].fila_espera);
+            
+            for (int j = 0; j < equipamentos[i].capacidade_maxima; j++) {
+                if (equipamentos[i].itens_em_preparo[j].nome == NADA) {
+                    equipamentos[i].itens_em_preparo[j] = item_node->item;
+                    equipamentos[i].funcionarios_alocados[j] = operador;
+                    equipamentos[i].capacidade_usada++;
+                    
+                    item_node->item.item_original->status = EM_PREPARO;
+                    
+                    printf("EQUIPAMENTO %d: Funcionario %d iniciou preparo do item '", i, operador->funcionario.id);
+                    imprimirNomeDoItem(item_node->item.nome);
+                    printf("' (Pedido %d).\n", item_node->item.pedido_pai->id);
+
+                    free(item_node);
+                    break; 
+                }
+            }
+        }
+    }
+}
+
+static int next_pedido_id = 1;
+
+int calcularPreparo(NomePedido pedido) {
+    switch (pedido) {
+        case BATATA_FRITA: return 190;
+        case SANDUICHE_SIMPLES: return 58;
+        case SANDUICHE_MEDIO: return 88;
+        case SANDUICHE_ELABORADO: return 105;
+        case REFRIGERANTE: return 5;
+        case SUCO: return 38;
+        case MILK_SHAKE: return 60;
+        case NADA: return 0;
+        default: return 0;
+    }
+}
+
+NodePedido* receberPedido(bool res_auto, int *novo_id) {
+    Pedido p;
+    memset(&p, 0, sizeof(Pedido));
+    p.id = next_pedido_id++;
+    p.status = RECEBIDO;
+    p.num_itens = 0;
+    p.tempo_chegada = (int) time(NULL);
+
+    printf("\nEscolha ate 2 itens (1 de comer e 1 de beber)\n");
+
+    printf("\n==== Itens de Comer ====\n");
+    printf(" 1-Sanduiche Simples, 2-Sanduiche Medio, 3-Sanduiche Elaborado, 4-Batata Frita, 5-Nada\n");
+    printf("Resposta: ");
+    int item_comer = receberInput(res_auto, 5, 5);
+    if (item_comer != 5) {
+        NomePedido np = (NomePedido)(item_comer - 1);
+        p.itens[p.num_itens].nome = np;
+        p.itens[p.num_itens].tempo_preparo_total = calcularPreparo(np);
+        p.itens[p.num_itens].status = AGUARDANDO_PREPARADO;
+        p.num_itens++;
+    }
+
+    printf("\n==== Itens de Beber ====\n");
+    printf("1-Refrigerante, 2-Milk-Shake, 3-Suco, 4-Nada\n");
+    printf("Resposta: ");
+    int item_beber = receberInput(res_auto, 4, 4);
+    if (item_beber != 4) {
+        NomePedido np = (NomePedido)(item_beber + 4 - 1);
+        p.itens[p.num_itens].nome = np;
+        p.itens[p.num_itens].tempo_preparo_total = calcularPreparo(np);
+        p.itens[p.num_itens].status = AGUARDANDO_PREPARADO;
+        p.num_itens++;
+    }
+
+    int soma = 0;
+    for (int i = 0; i < p.num_itens; ++i) soma += p.itens[i].tempo_preparo_total;
+    p.tempo_preparo_total = soma;
+    p.tempo_restante_preparo = soma;
+
+    NodePedido *node = criarNodePedido(p);
+    if (novo_id) *novo_id = p.id;
+    return node;
+}
+
+void recepcao(Locais *r, bool res_auto, ListaFuncionarios *reserva) {
+    NodeFuncionario *caixa = encontrarEAlocarFuncionario(reserva, HABILIDADE_CAIXA);
+    if (caixa == NULL) {
+        printf("RECEPCAO: Nenhum caixa disponivel.\n");
+        return; 
+    }
+    printf("RECEPCAO: Funcionario %d iniciou o atendimento.\n", caixa->funcionario.id);
+    
+    caixa->funcionario.local_atual = RECEPCAO;
+    adicionarListaFuncionario(&r->funcionario, caixa);
+
+    int novo_id = 0;
+    NodePedido *novo_pedido = receberPedido(res_auto, &novo_id);
+    if (!novo_pedido || novo_pedido->pedido.num_itens == 0) {
+        printf("Pedido vazio ou falha ao criar. Devolvendo funcionario para reserva.\n");
+        if (novo_pedido) free(novo_pedido);
+        liberarFuncionario(caixa, &r->funcionario, reserva);
+        return;
+    }
+    
+    novo_pedido->pedido.tempo_preparo_local = 30; // 30s para atendimento
+    caixa->funcionario.pedido_trabalhado = novo_pedido;
+    
+    printf("Pedido %d sendo processado na recepcao (duracao: 30s).\n", novo_id);
 }
