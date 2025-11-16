@@ -3,7 +3,7 @@
 #include <stdbool.h>
 #include "funcoes.h"
 
-#define FIM_EXPEDIENTE_THRESHOLD 3600
+#define FIM_EXPEDIENTE_THRESHOLD 600
 // Limite N=5 agora está definido em funcoes.c
 
 // <<< ALTERAÇÃO: Assinatura mudou >>>
@@ -34,6 +34,7 @@ void main_loop(FILE *arquivo_entrada, int timer_global, int tam_ciclo, Restauran
         if (continuar_lendo_arquivo) {
             // Sempre tenta ler, mas passa o status 'restaurante_aberto'
             // A própria 'recepcao' vai rejeitar pedidos se o restaurante estiver fechado.
+            // Se 'recepcao' retornar false, significa Fim de Arquivo.
             continuar_lendo_arquivo = recepcao(arquivo_entrada, restaurantes, timer_global, tempo_simulacao, restaurante_aberto);
         } else if (restaurante_aberto) {
             printf("\n[SISTEMA] Fim do arquivo de entrada. Restaurante continua aberto.\n");
@@ -47,7 +48,7 @@ void main_loop(FILE *arquivo_entrada, int timer_global, int tam_ciclo, Restauran
         for (int i = 0; i < 2; i++) {
             Restaurante *res = &restaurantes[i];
             
-            printf("\n\n--- [R%d] INICIO DO CICLO %d ---", res->id, tempo_simulacao / tam_ciclo);
+            printf("\n\n------------------- [R%d] INICIO DO CICLO %d -------------------\n", res->id, tempo_simulacao / tam_ciclo);
             
             // --- ACONTECIMENTOS ---
             printf("\n[R%d] [EVENTOS] Verificando eventos do ciclo...\n", res->id);
@@ -68,30 +69,31 @@ void main_loop(FILE *arquivo_entrada, int timer_global, int tam_ciclo, Restauran
             montarBandeja(res);
 
             // --- RELATÓRIOS (O que o usuário quer ver) ---
-            printf("\n--- [R%d] RELATÓRIO DE ESTADO ---", res->id);
+            printf("\n\n--- [R%d] RELATÓRIO DE FILAS E ESTADO ---", res->id);
             
-            // 1. "filas do equipamentos (Dos itens sendo feitos)" + Fila de espera de itens
+            // "fila em preparo"
+            imprimirLista(res->pedidos_em_preparo, res->id, "FILA: Pedidos em Preparo (Aguardando Itens)");
+            
+            // "fila de itens em separação" e "fila de prioridade" (do separador)
+            imprimirFilaSeparacao(res);
+            
+            // "filas dos equipamentos" e "itens sendo feitos"
             imprimirStatusEquipamentos(res);
             
-            // 2. "fila de itens em separação" (Fila do local SEPARADOR) + "fila de prioridade"
-            imprimirFilasLocais(res);
+            // "fila de prioridade" (dos outros locais)
+            imprimirFilasPrioridadeRestantes(res);
 
-            // 3. "fila do estoque"
+            // "fila dos estoques"
             imprimirListaArmazenados(res->estoque, res->id);
             
-            // 4. "fila dos pedidos na fila de itens em preparo"
-            printf("\n"); // Espaçador
-            imprimirLista(res->pedidos_em_preparo, res->id, "PEDIDOS EM PREPARO (Aguardando Itens)");
-            
-            // 5. "filas do itens feitos"
-            printf("\n"); // Espaçador
-            imprimirLista(res->pedidos_entregues, res->id, "PEDIDOS ENTREGUES (Finalizados)");
+            // "fila dos itens prontos"
+            imprimirLista(res->pedidos_entregues, res->id, "FILA: Pedidos Entregues (Finalizados)");
 
             if (res->pedidos_postergados.cabeca != NULL) {
                 printf("\n"); // Espaçador
-                imprimirLista(res->pedidos_postergados, res->id, "PEDIDOS POSTERGADOS");
+                imprimirLista(res->pedidos_postergados, res->id, "FILA: Pedidos Postergados");
             }
-            printf("--- [R%d] FIM DO RELATÓRIO ---\n", res->id);
+            printf("\n--- [R%d] FIM DO RELATÓRIO DE ESTADO ---\n", res->id);
             // --- FIM RELATÓRIOS ---
         }
 
@@ -130,7 +132,7 @@ void main_loop(FILE *arquivo_entrada, int timer_global, int tam_ciclo, Restauran
 }
 
 int main() {
-    int timer_global = 3600;
+    int timer_global = 3600; // <<< AUMENTADO PARA 1 HORA (3600s) >>>
     int tam_ciclo = 10;
     
     FILE *arquivo_entrada = fopen("entrada.txt", "r");
@@ -155,6 +157,7 @@ int main() {
         // Inicializa Locais
         for (int i = 0; i < 5; ++i) {
             restaurantes[r_idx].locais[i].nome = (NomeLocal) i;
+            // <<< ALTERAÇÃO: Inicializa a fila_espera única >>>
             restaurantes[r_idx].locais[i].fila_espera = criarLista();
             
             restaurantes[r_idx].locais[i].funcionario = criarListaFuncionarios();
