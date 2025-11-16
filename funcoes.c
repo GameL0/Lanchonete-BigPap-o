@@ -19,9 +19,7 @@ void sair() {
     exit(0);
 }
 
-// <<< FUNÇÃO REMOVIDA: fazerPedido() >>>
-// <<< FUNÇÃO REMOVIDA: receberInput() >>>
-
+// Funções de Input removidas (agora é automático)
 
 /*----------------- HEAP (min-heap por tempo_preparo_total) -----------------*/
 int criarHeap(Heap *heap, int capacidade) {
@@ -193,7 +191,7 @@ NodePedido* removerPedidoPorPrioridade(Locais *local, const char** origem_fila) 
 
 
 void imprimirLista(ListaPedidos lista, int restaurante_id, const char* label) {
-    printf("\n[R%d] %s (%d pedidos):\n", restaurante_id, label, lista.quantidade);
+    printf("\n[R%d] %s (%d pedidos):\n", restaurante_id, label, lista.quantidade); // Adicionado \n
     NodePedido *atual = lista.cabeca;
     if (!atual) {
         printf("    (Lista vazia)\n");
@@ -229,15 +227,17 @@ void imprimirStatusItem(StatusItem status) {
     }
 }
 
+// <<< ALTERAÇÃO: Print focado em ID e Tipo, conforme solicitado >>>
 void imprimirPedido(Pedido pedido) {
     const char* tipo_str = (pedido.tipo == IFOOD) ? "iFood" : "Presencial";
-    printf("    -> Pedido ID:%d (Senha: %d, Tipo: %s, Chegou: %ds, Duracao: %ds)\n", 
-        pedido.id, pedido.id_senha, tipo_str, pedido.tempo_chegada, pedido.tempo_preparo_total);
+    printf("    -> Pedido ID:%d (Tipo: %s)\n", 
+        pedido.id, tipo_str);
 }
 
+// <<< ALTERAÇÃO: Espaçamento melhorado >>>
 void imprimirStatusEquipamentos(Restaurante *res) {
     const char* nomes_equipamentos[] = {"PENEIRA", "CHAPA", "LIQUIDIFICADOR_MILK_SHAKE", "LIQUIDIFICADOR_SUCO"};
-    printf("\n[R%d] === STATUS DOS EQUIPAMENTOS ===\n", res->id);
+    printf("\n[R%d] === EQUIPAMENTOS: ITENS SENDO FEITOS E FILAS ===\n", res->id);
     for (int i = 0; i < 4; i++) {
         if (i > 0) printf("\n"); // Espaçador entre equipamentos
         Equipamento equip = res->equipamentos[i];
@@ -288,29 +288,48 @@ void imprimirStatusEquipamentos(Restaurante *res) {
             }
         }
     }
-    printf("[R%d] ===============================\n", res->id);
+    printf("[R%d] ===============================================\n", res->id);
 }
 
 
-void imprimirFilasLocais(Restaurante *res) {
-    const char* nomes_locais[] = {"RECEPCAO", "MONTAR_BANDEJAS", "SEPARADOR"};
-    NomeLocal locais_para_verificar[] = {RECEPCAO, MONTAR_BANDEJAS, SEPARADOR};
-    int num_locais = 3;
+// <<< FUNÇÃO REMOVIDA: imprimirFilasLocais >>>
 
-    printf("\n[R%d] === FILAS DE ESPERA DOS LOCAIS ===\n", res->id);
-    for (int i = 0; i < num_locais; i++) {
-        if (i > 0) printf("\n"); // Espaçador entre locais
-        Locais *local = &res->locais[locais_para_verificar[i]];
-        printf("  --- Local: %s ---\n", nomes_locais[i]);
+// <<< NOVA FUNÇÃO: Imprime apenas a fila de separação >>>
+void imprimirFilaSeparacao(Restaurante *res) {
+    Locais *local = &res->locais[SEPARADOR];
+    const char* nome_local = "SEPARACAO";
+    
+    printf("\n[R%d] === FILA DE SEPARACAO ===\n", res->id);
+    imprimirLista(local->fila_espera, res->id, "Fila de Espera (iFood/Presencial)");
+    imprimirLista(local->pedido_sendo_feitos, res->id, "Itens Sendo Separados");
+    printf("[R%d] =========================\n", res->id);
+}
 
-        // Fila Única
-        imprimirLista(local->fila_espera, res->id, "Fila de Espera (iFood/Presencial)");
+// <<< NOVA FUNÇÃO: Imprime apenas as filas de prioridade >>>
+void imprimirFilaPrioridade(Restaurante *res) {
+    printf("\n[R%d] === FILAS DE PRIORIDADE (HEAP) ===\n", res->id);
+    
+    Locais *local_r = &res->locais[RECEPCAO];
+    if(local_r->heap.quantidade > 0) {
+        imprimirHeap(&local_r->heap, res->id, "RECEPCAO");
+    }
+    
+    Locais *local_s = &res->locais[SEPARADOR];
+    if(local_s->heap.quantidade > 0) {
+        imprimirHeap(&local_s->heap, res->id, "SEPARADOR");
+    }
 
-        // Fila de Prioridade
-        imprimirHeap(&local->heap, res->id, nomes_locais[i]);
+    Locais *local_m = &res->locais[MONTAR_BANDEJAS];
+    if(local_m->heap.quantidade > 0) {
+        imprimirHeap(&local_m->heap, res->id, "MONTAR_BANDEJAS");
+    }
+
+    if (local_r->heap.quantidade == 0 && local_s->heap.quantidade == 0 && local_m->heap.quantidade == 0) {
+        printf("    (Nenhuma fila de prioridade ativa)\n");
     }
     printf("[R%d] ==================================\n", res->id);
 }
+
 
 
 /*----------------- Fila de Prioridade -----------------*/
@@ -1138,7 +1157,6 @@ static void adicionarItemAoPedido(Pedido* p, NomePedido nome, int quantidade) {
     }
 }
 
-// <<< ALTERAÇÃO: Lógica de 'tipo' removida daqui >>>
 NodePedido* lerNovoPedidoFormatado(FILE *arquivo_entrada, int tempo_simulacao_atual) {
     Pedido p;
     memset(&p, 0, sizeof(Pedido));
@@ -1148,7 +1166,7 @@ NodePedido* lerNovoPedidoFormatado(FILE *arquivo_entrada, int tempo_simulacao_at
     p.tempo_chegada = tempo_simulacao_atual;
 
     char buffer[100];
-    char tipo_pedido_str[20]; // Apenas lido, não mais usado para setar tipo
+    char tipo_pedido_str[20]; 
     char senha_str[20]; // Para ler "0" ou "-"
 
     printf("\n[SISTEMA] Lendo pedido do arquivo 'entrada.txt' (t=%d)...\n", tempo_simulacao_atual);
@@ -1263,12 +1281,10 @@ bool recepcao(FILE *arquivo_entrada, Restaurante restaurantes[], int timer_globa
     
     // 1. Fim do arquivo?
     if (novo_pedido == NULL) {
-        // Se feof retornar true, é o fim do arquivo.
         if (feof(arquivo_entrada)) {
              printf("[ROTEADOR] Fim do arquivo de entrada.\n");
             return false; // Sinaliza para PARAR de ler
         }
-        // Se não for feof, foi um erro de leitura ou pedido inválido (>300s ou 0 itens)
         printf("[ROTEADOR] Pedido descartado (erro de leitura, >300s, ou 0 itens).\n");
         return true; // Sinaliza para CONTINUAR lendo
     }
