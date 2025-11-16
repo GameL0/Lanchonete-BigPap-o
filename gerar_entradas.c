@@ -2,13 +2,6 @@
 #include <stdlib.h>
 #include <time.h>
 
-/*
-Este é um programa separado. Compile e execute-o primeiro.
-Exemplo:
-1. gcc gerar_entradas.c -o gerar_entradas
-2. ./gerar_entradas
-3. ./seu_programa_de_simulacao (que agora vai ler o 'entrada.txt')
-*/
 
 // Tempos de preparo (espelhados da simulação principal)
 const int T_BATATA = 190;
