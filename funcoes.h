@@ -33,7 +33,10 @@ void imprimirNomeDoItem(NomePedido nome);
 void imprimirStatusItem(StatusItem status);
 void imprimirPedido(Pedido pedido); 
 void imprimirStatusEquipamentos(Restaurante *res); 
-void imprimirFilasLocais(Restaurante *res);      
+// <<< ALTERAÇÃO: Funções de relatório específicas >>>
+void imprimirFilaSeparacao(Restaurante *res);
+void imprimirFilasPrioridadeRestantes(Restaurante *res);
+// void imprimirFilasLocais(Restaurante *res); // <<< REMOVIDA
 
 // Funções de Lista de Itens para Preparo
 ListaItemPreparo criarListaItemPreparo();
@@ -69,7 +72,6 @@ void gerenciarTodosEquipamentos(Restaurante *res, bool restaurante_aberto);
 float estimarTempoTotalPedido(Pedido* pedido, Restaurante *res); 
 NodePedido* lerNovoPedidoFormatado(FILE *arquivo_entrada, int tempo_simulacao_atual); 
 
-// <<< ALTERAÇÃO: Assinatura mudou, agora recebe bool restaurante_aberto >>>
 bool recepcao(FILE *arquivo_entrada, Restaurante restaurantes[], int timer_global, int tempo_simulacao_atual, bool restaurante_aberto); 
 
 // Funções de processamento de um restaurante
